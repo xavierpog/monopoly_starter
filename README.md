@@ -22,7 +22,7 @@ uvicorn app:app --reload
 1. Ouvrez **http://localhost:8000** dans votre navigateur
 2. Entrez votre nom et un code de salle (ex: `partie1`)
 3. Ouvrez un **deuxième onglet** (ou un autre navigateur) et rejoignez la même salle
-4. Une fois 2 joueurs connectés, cliquez **▶ Démarrer la partie**
+4. Une fois 2 joueurs connectés, cliquez **Démarrer la partie**
 
 ## Commandes en jeu
 
