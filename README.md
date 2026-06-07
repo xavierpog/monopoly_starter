@@ -32,7 +32,7 @@ uvicorn app:app --reload
 | Lancer les dés | Déplace votre pion (votre tour uniquement) |
 | Acheter | Achète la propriété sur laquelle vous êtes |
 
-## Structure du projet (pour la suite)
+## Structure du projet
 
 ```
 monopoly_starter/
@@ -47,7 +47,7 @@ monopoly_starter/
 # └── tests/          ← Tests unitaires (pytest)
 ```
 
-## Hébergement gratuit (quand vous serez prêt)
+## Hébergement gratuit (pas fait encore)
 
 | Service | Usage | Limite gratuite |
 |---|---|---|
