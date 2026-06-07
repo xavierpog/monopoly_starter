@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Monopoly Online</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
+
+#join {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 100vh; gap: 10px;
+}
+#join h1 { font-size: 2rem; margin-bottom: 10px; }
+#join input, #join button {
+  padding: 8px 14px; font-size: 1rem; width: 260px;
+  border: 1px solid #aaa; border-radius: 4px;
+}
+#join button { background: #222; color: #fff; cursor: pointer; }
+
+#game { display: none; padding: 12px; gap: 12px; }
+#game.active { display: grid; grid-template-columns: 1fr 300px; }
+
+/* Board */
+#board {
+  display: grid;
+  grid-template-columns: repeat(11, 58px);
+  grid-template-rows: repeat(11, 58px);
+  gap: 1px; background: #999;
+}
+.sq {
+  background: #fff; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-size: 0.48rem; text-align: center; padding: 2px;
+  position: relative; overflow: hidden;
+}
+.sq.corner { font-size: 0.6rem; background: #e8e8e8; font-weight: bold; }
+.color-bar { width: 100%; height: 7px; position: absolute; top: 0; }
+.sq-label { margin-top: 9px; line-height: 1.2; }
+.sq-price { color: #666; font-size: 0.45rem; }
+.sq.owned { outline: 2px solid #333; }
+.pions { position: absolute; bottom: 1px; right: 2px; font-size: 0.75rem; }
+.center-cell {
+  grid-column: 2/11; grid-row: 2/11;
+  background: #fff; display: flex; align-items: center;
+  justify-content: center; font-size: 1.6rem; font-weight: bold; letter-spacing: 2px;
+}
+
+/* Colors */
+.brown    { background: #8B4513; }
+.cyan     { background: #00BFFF; }
+.pink     { background: #FF69B4; }
+.orange   { background: #FFA500; }
+.red      { background: #FF0000; }
+.yellow   { background: #FFD700; }
+.green    { background: #228B22; }
+.darkblue { background: #00008B; }
+.station  { background: #888; }
+
+/* Panel */
+#panel { display: flex; flex-direction: column; gap: 10px; }
+#players-box, #controls, #log-box {
+  background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 10px;
+}
+#players-box h3, #controls h3, #log-box h3 { font-size: 0.95rem; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+.pcard { font-size: 0.85rem; padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
+.pcard.active-turn { font-weight: bold; }
+.pcard .pmoney { color: #2a7a2a; }
+
+#controls { display: flex; flex-direction: column; gap: 6px; }
+#controls button {
+  padding: 8px; border: 1px solid #aaa; background: #f5f5f5;
+  cursor: pointer; font-size: 0.9rem; border-radius: 3px;
+}
+#controls button:hover:not(:disabled) { background: #e0e0e0; }
+#controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+#log { font-size: 0.78rem; max-height: 220px; overflow-y: auto; line-height: 1.6; }
+#chat-row { display: flex; gap: 5px; margin-top: 6px; }
+#chat-in { flex: 1; border: 1px solid #ccc; padding: 4px; font-size: 0.8rem; border-radius: 3px; }
+#chat-btn { background: #222; color: #fff; border: none; padding: 4px 10px; cursor: pointer; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div id="join">
+  <h1>Monopoly Online</h1>
+  <input id="inp-name" placeholder="Votre prénom" />
+  <input id="inp-room" placeholder="Code de la salle (ex: partie1)" />
+  <button onclick="join()">Rejoindre / Créer</button>
+</div>
+
+<div id="game">
+  <div id="board"></div>
+  <div id="panel">
+    <div id="players-box"><h3>Joueurs</h3><div id="players"></div></div>
+    <div id="controls">
+      <h3>Actions</h3>
+      <button id="btn-start" onclick="send('start')">▶ Démarrer (2 joueurs min.)</button>
+      <button id="btn-roll"  onclick="send('roll')"  disabled>🎲 Lancer les dés</button>
+      <button id="btn-buy"   onclick="send('buy')"   disabled>🏠 Acheter la propriété</button>
+    </div>
+    <div id="log-box">
+      <h3>Journal</h3>
+      <div id="log"></div>
+      <div id="chat-row">
+        <input id="chat-in" placeholder="Message..." onkeydown="if(event.key==='Enter')chat()"/>
+        <button id="chat-btn" onclick="chat()">Envoyer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let ws, myPid, gs;
+
+const PROPS = {
+  1:{n:"Méditerranée",c:"brown"},3:{n:"Baltic",c:"brown"},
+  6:{n:"Oriental",c:"cyan"},9:{n:"Connecticut",c:"cyan"},
+  11:{n:"St-Charles",c:"pink"},14:{n:"Virginia",c:"pink"},
+  16:{n:"St-James",c:"orange"},19:{n:"New York",c:"orange"},
+  21:{n:"Kentucky",c:"red"},24:{n:"Illinois",c:"red"},
+  26:{n:"Atlantic",c:"yellow"},29:{n:"Marvin",c:"yellow"},
+  31:{n:"Pacific",c:"green"},34:{n:"Pennsylvanie",c:"green"},
+  37:{n:"Park",c:"darkblue"},39:{n:"Boulevard",c:"darkblue"},
+  5:{n:"Gare 1",c:"station"},15:{n:"Gare 2",c:"station"},
+  25:{n:"Gare 3",c:"station"},35:{n:"Gare 4",c:"station"},
+};
+const SPEC = {0:"DÉPART",2:"Caisse",4:"Taxes",7:"Chance",10:"Prison",
+              17:"Caisse",20:"Parc",22:"Chance",30:"→Prison",33:"Caisse",36:"Chance",38:"Luxe"};
+
+// Grid positions: (col, row) 1-indexed
+const POS = {};
+for(let i=0;i<=10;i++) POS[i]=[i+1,11];
+for(let i=11;i<=20;i++) POS[i]=[1,11-(i-10)];
+for(let i=21;i<=30;i++) POS[i]=[i-20,1];
+for(let i=31;i<=39;i++) POS[i]=[11,i-30+1];
+
+function buildBoard() {
+  const b = document.getElementById('board');
+  b.innerHTML = '';
+  const cells = {};
+  for(let r=1;r<=11;r++) for(let c=1;c<=11;c++){
+    const d = document.createElement('div');
+    d.style.gridColumn = c; d.style.gridRow = r;
+    b.appendChild(d); cells[`${c},${r}`] = d;
+  }
+  // Center
+  const cc = cells['2,2'];
+  cc.className = 'center-cell';
+  cc.style.gridColumn = '2/11'; cc.style.gridRow = '2/11';
+  cc.textContent = 'MONOPOLY';
+  for(let r=2;r<=10;r++) for(let c=2;c<=10;c++)
+    if(!(c===2&&r===2)) cells[`${c},${r}`]?.remove();
+
+  for(let i=0;i<=39;i++){
+    const [c,r] = POS[i]; const sq = cells[`${c},${r}`];
+    if(!sq) continue;
+    sq.className = 'sq' + ([0,10,20,30].includes(i)?' corner':'');
+    sq.dataset.i = i;
+    let bar='', label='', price='';
+    if(PROPS[i]){ bar=`<div class="color-bar ${PROPS[i].c}"></div>`; label=PROPS[i].n; }
+    else { label = SPEC[i]||`#${i}`; }
+    sq.innerHTML = bar + `<div class="sq-label">${label}</div><div class="pions" id="p${i}"></div>`;
+  }
+}
+
+function render(s){
+  gs = s;
+  const isMyTurn = s.turn === myPid;
+  // Players
+  const pc = document.getElementById('players');
+  pc.innerHTML = s.players.map(p =>
+    `<div class="pcard${p.id===s.turn?' active-turn':''}">
+      ${p.icon} ${p.name}${p.id===myPid?' (vous)':''}
+      <span class="pmoney"> — ${p.money}$</span>
+      <span style="color:#888;font-size:.75rem"> case ${p.pos}${p.bankrupt?' 💀':''}</span>
+    </div>`
+  ).join('');
+  // Buttons
+  document.getElementById('btn-start').disabled = s.started || s.players.length < 2;
+  document.getElementById('btn-roll').disabled  = !s.started || !isMyTurn;
+  document.getElementById('btn-buy').disabled   = !s.started || !isMyTurn;
+  // Pions
+  document.querySelectorAll('.pions').forEach(e=>e.textContent='');
+  s.players.forEach(p=>{ const el=document.getElementById(`p${p.pos}`); if(el) el.textContent+=p.icon; });
+  // Owned
+  document.querySelectorAll('.sq').forEach(e=>e.classList.remove('owned'));
+  Object.keys(s.owned).forEach(k=>{ const sq=document.querySelector(`[data-i="${k}"]`); if(sq) sq.classList.add('owned'); });
+}
+
+function log(msg){
+  const l=document.getElementById('log');
+  l.innerHTML+=`<div>${msg}</div>`;
+  l.scrollTop=l.scrollHeight;
+}
+
+function send(cmd){ ws?.send(JSON.stringify({cmd})); }
+function chat(){ const i=document.getElementById('chat-in'); if(!i.value.trim()) return; ws?.send(JSON.stringify({cmd:'chat',text:i.value})); i.value=''; }
+
+function join(){
+  const name=document.getElementById('inp-name').value.trim();
+  const room=document.getElementById('inp-room').value.trim();
+  if(!name||!room){ alert('Remplissez les deux champs.'); return; }
+  ws = new WebSocket(`ws://${location.host}/ws/${encodeURIComponent(room)}/${encodeURIComponent(name)}`);
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if(m.event==='joined'){
+      myPid=m.pid;
+      document.getElementById('join').style.display='none';
+      document.getElementById('game').classList.add('active');
+      buildBoard();
+    } else if(m.event==='state'){ render(m); }
+    else if(m.event==='chat'){ log(m.msg); }
+  };
+  ws.onclose=()=>log('🔌 Déconnecté.');
+}
+</script>
+</body>
+</html>
