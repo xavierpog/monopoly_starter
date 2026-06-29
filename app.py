@@ -26,7 +26,7 @@ rooms: Dict[str, dict] = {}
 conns: Dict[str, Set[WebSocket]] = {}
 
 def new_room(rid):
-    rooms[rid] = {"players": {}, "order": [], "turn": 0, "started": False, "owned": {}}
+    rooms[rid] = {"players": {}, "order": [], "turn": 0, "started": False, "owned": {}, "pending_buy": None}
     conns[rid] = set()
 
 def add_player(rid, pid, name):
@@ -86,7 +86,7 @@ def get_state(rid):
     cur = room["order"][room["turn"] % len(room["order"])] if room["order"] else None
     return {"event": "state", "players": list(room["players"].values()),
             "turn": cur, "owned": {str(k): v for k, v in room["owned"].items()},
-            "started": room["started"]}
+            "started": room["started"], "pending_buy": room.get("pending_buy")}
 
 async def broadcast(rid, data):
     dead = set()
@@ -123,16 +123,28 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 if pid != cur:
                     await ws.send_json({"event": "chat", "msg": "⚠️ Pas votre tour."})
                     continue
-                for m in do_move(rid, pid):
+                msgs = do_move(rid, pid)
+                for m in msgs:
                     await broadcast(rid, {"event": "chat", "msg": m})
-                room["turn"] += 1
+                pos = rooms[rid]["players"][pid]["pos"]
+                if pos in PROPERTIES and pos not in room["owned"]:
+                    room["pending_buy"] = pid
+                else:
+                    room["turn"] += 1
                 await broadcast(rid, get_state(rid))
             elif cmd == "buy":
-                cur = room["order"][(room["turn"] - 1) % len(room["order"])]
-                if pid != cur:
+                if room.get("pending_buy") != pid:
                     await ws.send_json({"event": "chat", "msg": "⚠️ Pas votre tour."})
                     continue
                 await broadcast(rid, {"event": "chat", "msg": do_buy(rid, pid)})
+                room["pending_buy"] = None
+                room["turn"] += 1
+                await broadcast(rid, get_state(rid))
+            elif cmd == "skip_buy":
+                if room.get("pending_buy") != pid:
+                    continue
+                room["pending_buy"] = None
+                room["turn"] += 1
                 await broadcast(rid, get_state(rid))
             elif cmd == "chat":
                 n = room["players"][pid]["name"]

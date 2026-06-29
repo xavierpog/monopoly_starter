@@ -96,9 +96,10 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
     <div id="players-box"><h3>Joueurs</h3><div id="players"></div></div>
     <div id="controls">
       <h3>Actions</h3>
-      <button id="btn-start" onclick="send('start')">▶ Démarrer (2 joueurs min.)</button>
-      <button id="btn-roll"  onclick="send('roll')"  disabled>🎲 Lancer les dés</button>
-      <button id="btn-buy"   onclick="send('buy')"   disabled>🏠 Acheter la propriété</button>
+      <button id="btn-start" onclick="send('start')">Démarrer (2 joueurs min.)</button>
+      <button id="btn-roll"  onclick="send('roll')"  disabled>Lancer les dés</button>
+      <button id="btn-buy"   onclick="send('buy')"   disabled>Acheter la propriété</button>
+      <button id="btn-skip"  onclick="send('skip_buy')" disabled>Passer</button>
     </div>
     <div id="log-box">
       <h3>Journal</h3>
@@ -178,9 +179,11 @@ function render(s){
     </div>`
   ).join('');
   // Buttons
+  const canBuy = s.pending_buy === myPid;
   document.getElementById('btn-start').disabled = s.started || s.players.length < 2;
-  document.getElementById('btn-roll').disabled  = !s.started || !isMyTurn;
-  document.getElementById('btn-buy').disabled   = !s.started || !isMyTurn;
+  document.getElementById('btn-roll').disabled  = !s.started || !isMyTurn || canBuy;
+  document.getElementById('btn-buy').disabled   = !canBuy;
+  document.getElementById('btn-skip').disabled  = !canBuy;
   // Pions
   document.querySelectorAll('.pions').forEach(e=>e.textContent='');
   s.players.forEach(p=>{ const el=document.getElementById(`p${p.pos}`); if(el) el.textContent+=p.icon; });
