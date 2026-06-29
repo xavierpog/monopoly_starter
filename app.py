@@ -8,15 +8,23 @@ app = FastAPI()
 
 PROPERTIES = {
     1:{"name":"Méditerranée","price":60,"rent":2},   3:{"name":"Baltic","price":60,"rent":4},
-    6:{"name":"Oriental","price":100,"rent":6},       9:{"name":"Connecticut","price":120,"rent":8},
-    11:{"name":"St-Charles","price":140,"rent":10},  14:{"name":"Virginia","price":160,"rent":12},
-    16:{"name":"St-James","price":180,"rent":14},    19:{"name":"New York","price":200,"rent":16},
-    21:{"name":"Kentucky","price":220,"rent":18},    24:{"name":"Illinois","price":240,"rent":20},
-    26:{"name":"Atlantic","price":260,"rent":22},    29:{"name":"Marvin","price":280,"rent":24},
-    31:{"name":"Pacific","price":300,"rent":26},     34:{"name":"Pennsylvanie","price":320,"rent":28},
+    6:{"name":"Oriental","price":100,"rent":6},       8:{"name":"Vermont","price":100,"rent":6},
+    9:{"name":"Connecticut","price":120,"rent":8},
+    11:{"name":"St-Charles","price":140,"rent":10},  13:{"name":"États","price":140,"rent":10},
+    14:{"name":"Virginia","price":160,"rent":12},
+    16:{"name":"St-James","price":180,"rent":14},    18:{"name":"Tennessee","price":180,"rent":14},
+    19:{"name":"New York","price":200,"rent":16},
+    21:{"name":"Kentucky","price":220,"rent":18},    23:{"name":"Indiana","price":220,"rent":18},
+    24:{"name":"Illinois","price":240,"rent":20},
+    26:{"name":"Atlantic","price":260,"rent":22},    27:{"name":"Ventnor","price":260,"rent":22},
+    29:{"name":"Marvin","price":280,"rent":24},
+    31:{"name":"Pacific","price":300,"rent":26},     32:{"name":"Caroline N.","price":300,"rent":26},
+    34:{"name":"Pennsylvanie","price":320,"rent":28},
     37:{"name":"Park","price":350,"rent":35},        39:{"name":"Boulevard","price":400,"rent":50},
     5:{"name":"Gare 1","price":200,"rent":25},       15:{"name":"Gare 2","price":200,"rent":25},
     25:{"name":"Gare 3","price":200,"rent":25},      35:{"name":"Gare 4","price":200,"rent":25},
+    12:{"name":"Cie Électrique","price":150,"rent":0,"utility":True},
+    28:{"name":"Cie des Eaux","price":150,"rent":0,"utility":True},
 }
 SPECIAL = {0:"DÉPART",2:"Caisse",4:"Taxes -200$",7:"Chance",10:"Prison",
            17:"Caisse",20:"Parc Gratuit",22:"Chance",30:"→Prison",33:"Caisse",
@@ -40,7 +48,8 @@ def add_player(rid, pid, name):
 def do_move(rid, pid):
     room, player = rooms[rid], rooms[rid]["players"][pid]
     d1, d2 = random.randint(1, 6), random.randint(1, 6)
-    new_pos = (player["pos"] + d1 + d2) % 40
+    roll = d1 + d2
+    new_pos = (player["pos"] + roll) % 40
     msgs = [f"🎲 {player['name']} fait {d1}+{d2} → case {new_pos}"]
     if new_pos < player["pos"]:
         player["money"] += 200
@@ -56,9 +65,14 @@ def do_move(rid, pid):
             msgs.append(f"🏠 {p['name']} à vendre ({p['price']}$) — cliquez Acheter")
         elif owner != pid:
             o = room["players"][owner]
-            player["money"] -= p["rent"]
-            o["money"] += p["rent"]
-            msgs.append(f"💸 Loyer {p['rent']}$ → {o['name']}")
+            if p.get("utility"):
+                both = all(room["owned"].get(u) == owner for u in (12, 28))
+                rent = roll * (10 if both else 4)
+            else:
+                rent = p["rent"]
+            player["money"] -= rent
+            o["money"] += rent
+            msgs.append(f"💸 Loyer {rent}$ → {o['name']}")
             if player["money"] <= 0:
                 player["bankrupt"] = True
                 msgs.append(f"💀 {player['name']} en faillite!")

@@ -56,6 +56,7 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 .green    { background: #228B22; }
 .darkblue { background: #00008B; }
 .station  { background: #888; }
+.utility  { background: #5aab6e; }
 
 /* Panel */
 #panel { display: flex; flex-direction: column; gap: 10px; }
@@ -126,9 +127,12 @@ const PROPS = {
   37:{n:"Park",c:"darkblue"},39:{n:"Boulevard",c:"darkblue"},
   5:{n:"Gare 1",c:"station"},15:{n:"Gare 2",c:"station"},
   25:{n:"Gare 3",c:"station"},35:{n:"Gare 4",c:"station"},
+  12:{n:"Cie Électrique",c:"utility"},28:{n:"Cie des Eaux",c:"utility"},
 };
-const SPEC = {0:"DÉPART",2:"Caisse",4:"Taxes",7:"Chance",10:"Prison",
-              17:"Caisse",20:"Parc",22:"Chance",30:"→Prison",33:"Caisse",36:"Chance",38:"Luxe"};
+const SPEC = {0:"DÉPART",2:"Caisse",4:"Taxes",7:"Chance",8:"Vermont",10:"Prison",
+              12:"Cie Électrique",13:"États",17:"Caisse",18:"Tennessee",20:"Parc",
+              22:"Chance",23:"Indiana",27:"Ventnor",28:"Cie des Eaux",
+              30:"→Prison",32:"Caroline N.",33:"Caisse",36:"Chance",38:"Luxe"};
 
 // Grid positions: (col, row) 1-indexed
 const POS = {};
