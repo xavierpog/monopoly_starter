@@ -34,7 +34,7 @@ rooms: Dict[str, dict] = {}
 conns: Dict[str, Set[WebSocket]] = {}
 
 def new_room(rid):
-    rooms[rid] = {"players": {}, "order": [], "turn": 0, "started": False, "owned": {}, "pending_buy": None}
+    rooms[rid] = {"players": {}, "order": [], "turn": 0, "started": False, "owned": {}, "pending_buy": None, "pending_trade": None}
     conns[rid] = set()
 
 def add_player(rid, pid, name):
@@ -100,7 +100,8 @@ def get_state(rid):
     cur = room["order"][room["turn"] % len(room["order"])] if room["order"] else None
     return {"event": "state", "players": list(room["players"].values()),
             "turn": cur, "owned": {str(k): v for k, v in room["owned"].items()},
-            "started": room["started"], "pending_buy": room.get("pending_buy")}
+            "started": room["started"], "pending_buy": room.get("pending_buy"),
+            "pending_trade": room.get("pending_trade")}
 
 async def broadcast(rid, data):
     dead = set()
@@ -159,6 +160,54 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                     continue
                 room["pending_buy"] = None
                 room["turn"] += 1
+                await broadcast(rid, get_state(rid))
+            elif cmd == "trade_offer":
+                to = msg.get("to")
+                if to not in room["players"] or to == pid:
+                    await ws.send_json({"event": "chat", "msg": "❌ Joueur invalide."})
+                    continue
+                room["pending_trade"] = {
+                    "from": pid, "to": to,
+                    "offer_money": int(msg.get("offer_money", 0)),
+                    "offer_props": [int(x) for x in msg.get("offer_props", [])],
+                    "req_money":   int(msg.get("req_money", 0)),
+                    "req_props":   [int(x) for x in msg.get("req_props", [])],
+                }
+                from_name = room["players"][pid]["name"]
+                to_name   = room["players"][to]["name"]
+                await broadcast(rid, {"event": "chat", "msg": f"🤝 {from_name} propose un échange à {to_name}."})
+                await broadcast(rid, get_state(rid))
+            elif cmd == "trade_accept":
+                t = room.get("pending_trade")
+                if not t or t["to"] != pid:
+                    continue
+                giver, taker = room["players"][t["from"]], room["players"][t["to"]]
+                # Validate
+                if giver["money"] < t["offer_money"] or taker["money"] < t["req_money"]:
+                    await broadcast(rid, {"event": "chat", "msg": "❌ Fonds insuffisants pour l'échange."})
+                    room["pending_trade"] = None
+                    await broadcast(rid, get_state(rid))
+                    continue
+                if any(room["owned"].get(p) != t["from"] for p in t["offer_props"]) or \
+                   any(room["owned"].get(p) != t["to"]   for p in t["req_props"]):
+                    await broadcast(rid, {"event": "chat", "msg": "❌ Propriété invalide dans l'échange."})
+                    room["pending_trade"] = None
+                    await broadcast(rid, get_state(rid))
+                    continue
+                # Execute
+                giver["money"] -= t["offer_money"];  taker["money"] += t["offer_money"]
+                taker["money"] -= t["req_money"];    giver["money"] += t["req_money"]
+                for p in t["offer_props"]: room["owned"][p] = t["to"]
+                for p in t["req_props"]:   room["owned"][p] = t["from"]
+                room["pending_trade"] = None
+                await broadcast(rid, {"event": "chat", "msg": f"✅ Échange accepté entre {giver['name']} et {taker['name']}!"})
+                await broadcast(rid, get_state(rid))
+            elif cmd == "trade_reject":
+                t = room.get("pending_trade")
+                if not t or t["to"] != pid:
+                    continue
+                room["pending_trade"] = None
+                await broadcast(rid, {"event": "chat", "msg": f"❌ Échange refusé par {room['players'][pid]['name']}."})
                 await broadcast(rid, get_state(rid))
             elif cmd == "chat":
                 n = room["players"][pid]["name"]

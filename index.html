@@ -80,6 +80,50 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 #chat-row { display: flex; gap: 5px; margin-top: 6px; }
 #chat-in { flex: 1; border: 1px solid #ccc; padding: 4px; font-size: 0.8rem; border-radius: 3px; }
 #chat-btn { background: #222; color: #fff; border: none; padding: 4px 10px; cursor: pointer; border-radius: 3px; }
+
+/* Trade modal */
+#trade-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 100;
+  align-items: center; justify-content: center;
+}
+#trade-overlay.open { display: flex; }
+#trade-modal {
+  background: #fff; border-radius: 6px; padding: 20px;
+  width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+#trade-modal h2 { font-size: 1.1rem; margin-bottom: 14px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+#trade-modal label { font-size: 0.82rem; display: block; margin-bottom: 4px; color: #555; }
+#trade-modal select, #trade-modal input[type=number] {
+  width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 3px;
+  font-size: 0.85rem; margin-bottom: 12px;
+}
+.trade-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.trade-col h3 { font-size: 0.88rem; font-weight: bold; margin-bottom: 8px; }
+.trade-props { max-height: 160px; overflow-y: auto; border: 1px solid #eee; border-radius: 3px; padding: 6px; }
+.trade-props label { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: #222; cursor: pointer; }
+.trade-props input[type=checkbox] { width: auto; margin: 0; }
+.trade-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+.trade-actions button {
+  padding: 7px 16px; border-radius: 3px; border: 1px solid #aaa;
+  cursor: pointer; font-size: 0.88rem; background: #f5f5f5;
+}
+.trade-actions button.primary { background: #222; color: #fff; border-color: #222; }
+
+/* Incoming trade banner */
+#trade-incoming {
+  display: none; background: #fffbe6; border: 1px solid #f0c040;
+  border-radius: 4px; padding: 10px; font-size: 0.82rem;
+}
+#trade-incoming.open { display: block; }
+#trade-incoming h4 { margin-bottom: 6px; font-size: 0.88rem; }
+#trade-incoming .ti-actions { display: flex; gap: 6px; margin-top: 8px; }
+#trade-incoming .ti-actions button {
+  padding: 5px 12px; border-radius: 3px; border: 1px solid #aaa;
+  cursor: pointer; font-size: 0.82rem; background: #f5f5f5;
+}
+#trade-incoming .ti-actions button.accept { background: #2a7a2a; color: #fff; border-color: #2a7a2a; }
 </style>
 </head>
 <body>
@@ -101,7 +145,17 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
       <button id="btn-roll"  onclick="send('roll')"  disabled>Lancer les dés</button>
       <button id="btn-buy"   onclick="send('buy')"   disabled>Acheter la propriété</button>
       <button id="btn-skip"  onclick="send('skip_buy')" disabled>Passer</button>
+      <button id="btn-trade" onclick="openTrade()" disabled>🤝 Proposer un échange</button>
     </div>
+    <div id="trade-incoming">
+      <h4>🤝 Échange proposé</h4>
+      <div id="ti-details"></div>
+      <div class="ti-actions">
+        <button class="accept" onclick="send('trade_accept')">Accepter</button>
+        <button onclick="send('trade_reject')">Refuser</button>
+      </div>
+    </div>
+
     <div id="log-box">
       <h3>Journal</h3>
       <div id="log"></div>
@@ -109,6 +163,34 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
         <input id="chat-in" placeholder="Message..." onkeydown="if(event.key==='Enter')chat()"/>
         <button id="chat-btn" onclick="chat()">Envoyer</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="trade-overlay">
+  <div id="trade-modal">
+    <h2>🤝 Proposer un échange</h2>
+    <label>Proposer à</label>
+    <select id="trade-target"></select>
+    <div class="trade-cols">
+      <div class="trade-col">
+        <h3>J'offre</h3>
+        <label>Argent ($)</label>
+        <input type="number" id="trade-offer-money" min="0" value="0"/>
+        <label>Propriétés</label>
+        <div class="trade-props" id="trade-offer-props"></div>
+      </div>
+      <div class="trade-col">
+        <h3>Je demande</h3>
+        <label>Argent ($)</label>
+        <input type="number" id="trade-req-money" min="0" value="0"/>
+        <label>Propriétés</label>
+        <div class="trade-props" id="trade-req-props"></div>
+      </div>
+    </div>
+    <div class="trade-actions">
+      <button onclick="closeTrade()">Annuler</button>
+      <button class="primary" onclick="submitTrade()">Envoyer l'offre</button>
     </div>
   </div>
 </div>
@@ -188,6 +270,8 @@ function render(s){
   document.getElementById('btn-roll').disabled  = !s.started || !isMyTurn || canBuy;
   document.getElementById('btn-buy').disabled   = !canBuy;
   document.getElementById('btn-skip').disabled  = !canBuy;
+  document.getElementById('btn-trade').disabled = !s.started || s.players.filter(p=>p.id!==myPid&&!p.bankrupt).length===0;
+  renderIncomingTrade(s.pending_trade, s.players);
   // Pions
   document.querySelectorAll('.pions').forEach(e=>e.textContent='');
   s.players.forEach(p=>{ const el=document.getElementById(`p${p.pos}`); if(el) el.textContent+=p.icon; });
@@ -204,6 +288,64 @@ function log(msg){
 
 function send(cmd){ ws?.send(JSON.stringify({cmd})); }
 function chat(){ const i=document.getElementById('chat-in'); if(!i.value.trim()) return; ws?.send(JSON.stringify({cmd:'chat',text:i.value})); i.value=''; }
+
+const PROP_NAMES = {};
+Object.entries(PROPS).forEach(([k,v])=> PROP_NAMES[k]=v.n);
+
+function openTrade(){
+  if(!gs) return;
+  // Populate target players
+  const sel = document.getElementById('trade-target');
+  sel.innerHTML = gs.players.filter(p=>p.id!==myPid && !p.bankrupt)
+    .map(p=>`<option value="${p.id}">${p.icon} ${p.name}</option>`).join('');
+
+  // My properties
+  const myProps = Object.entries(gs.owned).filter(([,owner])=>owner===myPid).map(([k])=>k);
+  document.getElementById('trade-offer-props').innerHTML = myProps.length
+    ? myProps.map(k=>`<label><input type="checkbox" value="${k}"> ${PROP_NAMES[k]||'#'+k}</label>`).join('')
+    : '<em style="color:#aaa;font-size:.8rem">Aucune propriété</em>';
+
+  document.getElementById('trade-offer-money').value = 0;
+  document.getElementById('trade-req-money').value = 0;
+  renderReqProps();
+  sel.onchange = renderReqProps;
+  document.getElementById('trade-overlay').classList.add('open');
+}
+
+function renderReqProps(){
+  const targetId = document.getElementById('trade-target').value;
+  if(!targetId || !gs) return;
+  const theirProps = Object.entries(gs.owned).filter(([,owner])=>owner===targetId).map(([k])=>k);
+  document.getElementById('trade-req-props').innerHTML = theirProps.length
+    ? theirProps.map(k=>`<label><input type="checkbox" value="${k}"> ${PROP_NAMES[k]||'#'+k}</label>`).join('')
+    : '<em style="color:#aaa;font-size:.8rem">Aucune propriété</em>';
+}
+
+function closeTrade(){ document.getElementById('trade-overlay').classList.remove('open'); }
+
+function submitTrade(){
+  const to = document.getElementById('trade-target').value;
+  const offerMoney = parseInt(document.getElementById('trade-offer-money').value)||0;
+  const reqMoney   = parseInt(document.getElementById('trade-req-money').value)||0;
+  const offerProps = [...document.querySelectorAll('#trade-offer-props input:checked')].map(i=>parseInt(i.value));
+  const reqProps   = [...document.querySelectorAll('#trade-req-props input:checked')].map(i=>parseInt(i.value));
+  ws?.send(JSON.stringify({cmd:'trade_offer', to, offer_money:offerMoney, offer_props:offerProps, req_money:reqMoney, req_props:reqProps}));
+  closeTrade();
+}
+
+function renderIncomingTrade(trade, players){
+  const el = document.getElementById('trade-incoming');
+  if(!trade || trade.to !== myPid){ el.classList.remove('open'); return; }
+  const from = players.find(p=>p.id===trade.from);
+  const propName = k => PROP_NAMES[k]||'#'+k;
+  let html = `<strong>${from?.icon} ${from?.name}</strong> vous propose :<br>`;
+  if(trade.offer_money) html += `💵 Offre ${trade.offer_money}$<br>`;
+  if(trade.offer_props.length) html += `🏠 Offre : ${trade.offer_props.map(propName).join(', ')}<br>`;
+  if(trade.req_money) html += `💵 Demande ${trade.req_money}$<br>`;
+  if(trade.req_props.length) html += `🏠 Demande : ${trade.req_props.map(propName).join(', ')}<br>`;
+  document.getElementById('ti-details').innerHTML = html;
+  el.classList.add('open');
+}
 
 function join(){
   const name=document.getElementById('inp-name').value.trim();
