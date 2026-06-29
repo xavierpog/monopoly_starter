@@ -19,10 +19,10 @@ uvicorn app:app --reload
 
 ## Jouer en local
 
-1. Ouvrez **http://localhost:8000** dans votre navigateur
+1. Ouvrir **http://localhost:8000** dans votre navigateur
 2. Entrez votre nom et un code de salle (ex: `partie1`)
 3. Ouvrez un **deuxième onglet** (ou un autre navigateur) et rejoignez la même salle
-4. Une fois 2 joueurs connectés, cliquez **▶ Démarrer la partie**
+4. Une fois 2 joueurs connectés, cliquez **Démarrer la partie**
 
 ## Commandes en jeu
 
@@ -32,7 +32,7 @@ uvicorn app:app --reload
 | Lancer les dés | Déplace votre pion (votre tour uniquement) |
 | Acheter | Achète la propriété sur laquelle vous êtes |
 
-## Structure du projet (pour la suite)
+## Structure du projet
 
 ```
 monopoly_starter/
@@ -47,7 +47,7 @@ monopoly_starter/
 # └── tests/          ← Tests unitaires (pytest)
 ```
 
-## Hébergement gratuit (quand vous serez prêt)
+## Hébergement gratuit (pas fait encore)
 
 | Service | Usage | Limite gratuite |
 |---|---|---|
