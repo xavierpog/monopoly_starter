@@ -217,11 +217,12 @@ const SPEC = {0:"DÉPART",2:"Caisse",4:"Taxes",7:"Chance",8:"Vermont",10:"Prison
               30:"→Prison",32:"Caroline N.",33:"Caisse",36:"Chance",38:"Luxe"};
 
 // Grid positions: (col, row) 1-indexed
+// GO top-left → Prison top-right → bottom-right → bottom-left → up left side
 const POS = {};
-for(let i=0;i<=10;i++) POS[i]=[i+1,11];
-for(let i=11;i<=20;i++) POS[i]=[1,11-(i-10)];
-for(let i=21;i<=30;i++) POS[i]=[i-20,1];
-for(let i=31;i<=39;i++) POS[i]=[11,i-30+1];
+for(let i=0;i<=10;i++)  POS[i]=[i+1, 1];          // rangée du haut, gauche→droite
+for(let i=11;i<=20;i++) POS[i]=[11, i-10+1];       // colonne droite, haut→bas
+for(let i=21;i<=30;i++) POS[i]=[11-(i-20), 11];    // rangée du bas, droite→gauche
+for(let i=31;i<=39;i++) POS[i]=[1, 11-(i-30)];     // colonne gauche, bas→haut
 
 function buildBoard() {
   const b = document.getElementById('board');
