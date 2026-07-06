@@ -6,6 +6,44 @@ from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
+CHANCE_CARDS = [
+    {"id":"c1",  "text":"Avancez jusqu'au Boulevard. Si vous passez par DÉPART, recevez 200$.", "action":"goto", "dest":39},
+    {"id":"c2",  "text":"Avancez jusqu'au DÉPART. Recevez 200$.", "action":"goto", "dest":0},
+    {"id":"c3",  "text":"Avancez jusqu'à l'Illinois. Si vous passez par DÉPART, recevez 200$.", "action":"goto", "dest":24},
+    {"id":"c4",  "text":"Avancez jusqu'à St-Charles. Si vous passez par DÉPART, recevez 200$.", "action":"goto", "dest":11},
+    {"id":"c5",  "text":"Avancez à la gare la plus proche. Payez double loyer si elle est possédée.", "action":"nearest_railroad"},
+    {"id":"c6",  "text":"Avancez à la gare la plus proche. Payez double loyer si elle est possédée.", "action":"nearest_railroad"},
+    {"id":"c7",  "text":"Avancez à la compagnie la plus proche. Payez 10× le lancer si possédée.", "action":"nearest_utility"},
+    {"id":"c8",  "text":"La banque vous verse un dividende de 50$.", "action":"gain", "amount":50},
+    {"id":"c9",  "text":"Carte Sortie de Prison gratuite.", "action":"goojf"},
+    {"id":"c10", "text":"Reculez de 3 cases.", "action":"back3"},
+    {"id":"c11", "text":"Allez en Prison.", "action":"jail"},
+    {"id":"c12", "text":"Réparations générales : payez 25$ par maison, 100$ par hôtel.", "action":"repairs", "house":25, "hotel":100},
+    {"id":"c13", "text":"Amende pour excès de vitesse : payez 15$.", "action":"lose", "amount":15},
+    {"id":"c14", "text":"Avancez jusqu'à la Gare 1. Si vous passez par DÉPART, recevez 200$.", "action":"goto", "dest":5},
+    {"id":"c15", "text":"Vous êtes élu Président du Conseil : versez 50$ à chaque joueur.", "action":"pay_all", "amount":50},
+    {"id":"c16", "text":"Votre prêt immobilier arrive à maturité : recevez 150$.", "action":"gain", "amount":150},
+]
+
+COMMUNITY_CARDS = [
+    {"id":"cc1",  "text":"Avancez jusqu'au DÉPART. Recevez 200$.", "action":"goto", "dest":0},
+    {"id":"cc2",  "text":"Erreur bancaire en votre faveur : recevez 200$.", "action":"gain", "amount":200},
+    {"id":"cc3",  "text":"Honoraires du médecin : payez 50$.", "action":"lose", "amount":50},
+    {"id":"cc4",  "text":"Vente d'actions : recevez 50$.", "action":"gain", "amount":50},
+    {"id":"cc5",  "text":"Carte Sortie de Prison gratuite.", "action":"goojf"},
+    {"id":"cc6",  "text":"Allez en Prison.", "action":"jail"},
+    {"id":"cc7",  "text":"Nuit d'opéra : recevez 50$ de chaque joueur.", "action":"collect_all", "amount":50},
+    {"id":"cc8",  "text":"Fonds de vacances arrivé à maturité : recevez 100$.", "action":"gain", "amount":100},
+    {"id":"cc9",  "text":"Remboursement d'impôt : recevez 20$.", "action":"gain", "amount":20},
+    {"id":"cc10", "text":"C'est votre anniversaire : recevez 10$ de chaque joueur.", "action":"collect_all", "amount":10},
+    {"id":"cc11", "text":"Assurance-vie arrivée à maturité : recevez 100$.", "action":"gain", "amount":100},
+    {"id":"cc12", "text":"Frais d'hôpital : payez 100$.", "action":"lose", "amount":100},
+    {"id":"cc13", "text":"Frais de scolarité : payez 150$.", "action":"lose", "amount":150},
+    {"id":"cc14", "text":"Honoraires de consultant : recevez 25$.", "action":"gain", "amount":25},
+    {"id":"cc15", "text":"Réparations de voirie : payez 40$ par maison, 115$ par hôtel.", "action":"repairs", "house":40, "hotel":115},
+    {"id":"cc16", "text":"2e prix au concours de beauté : recevez 10$.", "action":"gain", "amount":10},
+]
+
 PROPERTIES = {
     1:{"name":"Méditerranée","price":60,"rent":2},   3:{"name":"Baltic","price":60,"rent":4},
     6:{"name":"Oriental","price":100,"rent":6},       8:{"name":"Vermont","price":100,"rent":6},
@@ -34,8 +72,103 @@ rooms: Dict[str, dict] = {}
 conns: Dict[str, Set[WebSocket]] = {}
 
 def new_room(rid):
-    rooms[rid] = {"players": {}, "order": [], "turn": 0, "started": False, "owned": {}, "pending_buy": None, "pending_trade": None}
+    chance = CHANCE_CARDS[:]
+    community = COMMUNITY_CARDS[:]
+    random.shuffle(chance)
+    random.shuffle(community)
+    rooms[rid] = {
+        "players": {}, "order": [], "turn": 0, "started": False, "owned": {},
+        "pending_buy": None, "pending_trade": None,
+        "chance_deck": chance, "community_deck": community,
+        "goojf": {},  # pid -> count
+    }
     conns[rid] = set()
+
+def draw_card(deck):
+    card = deck.pop(0)
+    deck.append(card)
+    return card
+
+RAILROADS = [5, 15, 25, 35]
+UTILITIES  = [12, 28]
+
+def nearest(pos, targets):
+    return min(targets, key=lambda t: (t - pos) % 40)
+
+def apply_card(rid, pid, card, roll):
+    room, player = rooms[rid], rooms[rid]["players"][pid]
+    msgs = [f"🃏 {card['text']}"]
+    action = card["action"]
+
+    if action == "gain":
+        player["money"] += card["amount"]
+    elif action == "lose":
+        player["money"] -= card["amount"]
+        if player["money"] <= 0:
+            player["bankrupt"] = True; msgs.append(f"💀 {player['name']} en faillite!")
+    elif action == "goto":
+        dest = card["dest"]
+        if dest <= player["pos"] and dest != player["pos"]:
+            player["money"] += 200; msgs.append("✅ Passage DÉPART +200$")
+        player["pos"] = dest
+        if dest == 0:
+            player["money"] += 200; msgs.append("✅ Passage DÉPART +200$")
+    elif action == "back3":
+        player["pos"] = (player["pos"] - 3) % 40
+    elif action == "jail":
+        player["pos"] = 10
+        msgs.append("🚔 En prison!")
+    elif action == "goojf":
+        room["goojf"][pid] = room["goojf"].get(pid, 0) + 1
+        msgs.append("🎫 Carte Sortie de Prison conservée.")
+    elif action == "pay_all":
+        amt = card["amount"]
+        others = [p for p in room["players"].values() if p["id"] != pid and not p["bankrupt"]]
+        total = amt * len(others)
+        player["money"] -= total
+        for o in others: o["money"] += amt
+        if player["money"] <= 0:
+            player["bankrupt"] = True; msgs.append(f"💀 {player['name']} en faillite!")
+    elif action == "collect_all":
+        amt = card["amount"]
+        others = [p for p in room["players"].values() if p["id"] != pid and not p["bankrupt"]]
+        for o in others:
+            o["money"] -= amt; player["money"] += amt
+    elif action == "repairs":
+        # No houses/hotels yet → no charge
+        pass
+    elif action == "nearest_railroad":
+        dest = nearest(player["pos"], RAILROADS)
+        if dest <= player["pos"]:
+            player["money"] += 200; msgs.append("✅ Passage DÉPART +200$")
+        player["pos"] = dest
+        owner = room["owned"].get(dest)
+        if owner and owner != pid:
+            rent = PROPERTIES[dest]["rent"] * 2
+            player["money"] -= rent; room["players"][owner]["money"] += rent
+            msgs.append(f"💸 Double loyer {rent}$ → {room['players'][owner]['name']}")
+            if player["money"] <= 0:
+                player["bankrupt"] = True; msgs.append(f"💀 {player['name']} en faillite!")
+        elif owner is None:
+            msgs.append(f"🏠 {PROPERTIES[dest]['name']} à vendre — cliquez Acheter")
+            return msgs, dest
+    elif action == "nearest_utility":
+        dest = nearest(player["pos"], UTILITIES)
+        if dest <= player["pos"]:
+            player["money"] += 200; msgs.append("✅ Passage DÉPART +200$")
+        player["pos"] = dest
+        owner = room["owned"].get(dest)
+        if owner and owner != pid:
+            rent = roll * 10
+            player["money"] -= rent; room["players"][owner]["money"] += rent
+            msgs.append(f"💸 {rent}$ (10× dés) → {room['players'][owner]['name']}")
+            if player["money"] <= 0:
+                player["bankrupt"] = True; msgs.append(f"💀 {player['name']} en faillite!")
+        elif owner is None:
+            msgs.append(f"🏠 {PROPERTIES[dest]['name']} à vendre — cliquez Acheter")
+            return msgs, dest
+
+    return msgs, None  # None = no pending buy
 
 def add_player(rid, pid, name):
     icons = ["🔴", "🔵", "🟢", "🟡"]
@@ -55,14 +188,27 @@ def do_move(rid, pid):
         player["money"] += 200
         msgs.append("✅ Passage DÉPART +200$")
     player["pos"] = new_pos
+    pending_buy_pos = None
+
     if new_pos == 30:
         player["pos"] = 10
         msgs.append("🚔 En prison!")
+    elif new_pos in (7, 22, 36):
+        card = draw_card(room["chance_deck"])
+        card_msgs, buy_pos = apply_card(rid, pid, card, roll)
+        msgs += card_msgs
+        pending_buy_pos = buy_pos
+    elif new_pos in (2, 17, 33):
+        card = draw_card(room["community_deck"])
+        card_msgs, buy_pos = apply_card(rid, pid, card, roll)
+        msgs += card_msgs
+        pending_buy_pos = buy_pos
     elif new_pos in PROPERTIES:
         p = PROPERTIES[new_pos]
         owner = room["owned"].get(new_pos)
         if owner is None:
             msgs.append(f"🏠 {p['name']} à vendre ({p['price']}$) — cliquez Acheter")
+            pending_buy_pos = new_pos
         elif owner != pid:
             o = room["players"][owner]
             if p.get("utility"):
@@ -82,7 +228,8 @@ def do_move(rid, pid):
         msgs.append(f"⭐ {SPECIAL[new_pos]}")
         if new_pos == 4:  player["money"] -= 200
         elif new_pos == 38: player["money"] -= 100
-    return msgs
+
+    return msgs, pending_buy_pos
 
 def do_buy(rid, pid):
     room, player = rooms[rid], rooms[rid]["players"][pid]
@@ -138,11 +285,10 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 if pid != cur:
                     await ws.send_json({"event": "chat", "msg": "⚠️ Pas votre tour."})
                     continue
-                msgs = do_move(rid, pid)
+                msgs, pending_buy_pos = do_move(rid, pid)
                 for m in msgs:
                     await broadcast(rid, {"event": "chat", "msg": m})
-                pos = rooms[rid]["players"][pid]["pos"]
-                if pos in PROPERTIES and pos not in room["owned"]:
+                if pending_buy_pos is not None and pending_buy_pos not in room["owned"]:
                     room["pending_buy"] = pid
                 else:
                     room["turn"] += 1
