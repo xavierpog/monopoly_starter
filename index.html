@@ -305,7 +305,9 @@ function render(s){
   document.getElementById('btn-buy').disabled   = !canBuy;
   document.getElementById('btn-skip').disabled  = !canBuy;
   document.getElementById('btn-trade').disabled = !s.started || s.players.filter(p=>p.id!==myPid&&!p.bankrupt).length===0;
-  document.getElementById('btn-build').disabled = !s.started;
+  const myOwned = Object.entries(s.owned||{}).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
+  const hasMonopoly = Object.keys(GROUP_MEMBERS).some(grp=>GROUP_MEMBERS[grp].every(p=>s.owned[p]===myPid));
+  document.getElementById('btn-build').disabled = !s.started || !hasMonopoly;
   renderIncomingTrade(s.pending_trade, s.players);
   // Pions
   document.querySelectorAll('.pions').forEach(e=>e.textContent='');
