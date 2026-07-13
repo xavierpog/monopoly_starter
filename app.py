@@ -44,26 +44,54 @@ COMMUNITY_CARDS = [
     {"id":"cc16", "text":"2e prix au concours de beauté : recevez 10$.", "action":"gain", "amount":10},
 ]
 
+# rents = [base, 1h, 2h, 3h, 4h, hotel]
 PROPERTIES = {
-    1:{"name":"Méditerranée","price":60,"rent":2},   3:{"name":"Baltic","price":60,"rent":4},
-    6:{"name":"Oriental","price":100,"rent":6},       8:{"name":"Vermont","price":100,"rent":6},
-    9:{"name":"Connecticut","price":120,"rent":8},
-    11:{"name":"St-Charles","price":140,"rent":10},  13:{"name":"États","price":140,"rent":10},
-    14:{"name":"Virginia","price":160,"rent":12},
-    16:{"name":"St-James","price":180,"rent":14},    18:{"name":"Tennessee","price":180,"rent":14},
-    19:{"name":"New York","price":200,"rent":16},
-    21:{"name":"Kentucky","price":220,"rent":18},    23:{"name":"Indiana","price":220,"rent":18},
-    24:{"name":"Illinois","price":240,"rent":20},
-    26:{"name":"Atlantic","price":260,"rent":22},    27:{"name":"Ventnor","price":260,"rent":22},
-    29:{"name":"Marvin","price":280,"rent":24},
-    31:{"name":"Pacific","price":300,"rent":26},     32:{"name":"Caroline N.","price":300,"rent":26},
-    34:{"name":"Pennsylvanie","price":320,"rent":28},
-    37:{"name":"Park","price":350,"rent":35},        39:{"name":"Boulevard","price":400,"rent":50},
-    5:{"name":"Gare 1","price":200,"rent":25},       15:{"name":"Gare 2","price":200,"rent":25},
-    25:{"name":"Gare 3","price":200,"rent":25},      35:{"name":"Gare 4","price":200,"rent":25},
-    12:{"name":"Cie Électrique","price":150,"rent":0,"utility":True},
-    28:{"name":"Cie des Eaux","price":150,"rent":0,"utility":True},
+    1: {"name":"Méditerranée", "price":60,  "rents":[2,  10, 30,  90,  160, 250]},
+    3: {"name":"Baltic",       "price":60,  "rents":[4,  20, 60,  180, 320, 450]},
+    6: {"name":"Oriental",     "price":100, "rents":[6,  30, 90,  270, 400, 550]},
+    8: {"name":"Vermont",      "price":100, "rents":[6,  30, 90,  270, 400, 550]},
+    9: {"name":"Connecticut",  "price":120, "rents":[8,  40, 100, 300, 450, 600]},
+   11: {"name":"St-Charles",   "price":140, "rents":[10, 50, 150, 450, 625, 750]},
+   13: {"name":"États",        "price":140, "rents":[10, 50, 150, 450, 625, 750]},
+   14: {"name":"Virginia",     "price":160, "rents":[12, 60, 180, 500, 700, 900]},
+   16: {"name":"St-James",     "price":180, "rents":[14, 70, 200, 550, 750, 950]},
+   18: {"name":"Tennessee",    "price":180, "rents":[14, 70, 200, 550, 750, 950]},
+   19: {"name":"New York",     "price":200, "rents":[16, 80, 220, 600, 800,1000]},
+   21: {"name":"Kentucky",     "price":220, "rents":[18, 90, 250, 700, 875,1050]},
+   23: {"name":"Indiana",      "price":220, "rents":[18, 90, 250, 700, 875,1050]},
+   24: {"name":"Illinois",     "price":240, "rents":[20,100, 300, 750, 925,1100]},
+   26: {"name":"Atlantic",     "price":260, "rents":[22,110, 330, 800, 975,1150]},
+   27: {"name":"Ventnor",      "price":260, "rents":[22,110, 330, 800, 975,1150]},
+   29: {"name":"Marvin",       "price":280, "rents":[24,120, 360, 850,1025,1200]},
+   31: {"name":"Pacific",      "price":300, "rents":[26,130, 390, 900,1100,1275]},
+   32: {"name":"Caroline N.",  "price":300, "rents":[26,130, 390, 900,1100,1275]},
+   34: {"name":"Pennsylvanie", "price":320, "rents":[28,150, 450,1000,1200,1400]},
+   37: {"name":"Park",         "price":350, "rents":[35,175, 500,1100,1300,1500]},
+   39: {"name":"Boulevard",    "price":400, "rents":[50,200, 600,1400,1700,2000]},
+    5: {"name":"Gare 1",       "price":200, "rents":[25,25,25,25,25,25]},
+   15: {"name":"Gare 2",       "price":200, "rents":[25,25,25,25,25,25]},
+   25: {"name":"Gare 3",       "price":200, "rents":[25,25,25,25,25,25]},
+   35: {"name":"Gare 4",       "price":200, "rents":[25,25,25,25,25,25]},
+   12: {"name":"Cie Électrique","price":150,"rents":[0,0,0,0,0,0],"utility":True},
+   28: {"name":"Cie des Eaux", "price":150, "rents":[0,0,0,0,0,0],"utility":True},
 }
+
+# Groupes de couleurs : pos → groupe
+COLOR_GROUPS = {
+    1:"brown",  3:"brown",
+    6:"cyan",   8:"cyan",   9:"cyan",
+   11:"pink",  13:"pink",  14:"pink",
+   16:"orange",18:"orange",19:"orange",
+   21:"red",   23:"red",   24:"red",
+   26:"yellow",27:"yellow",29:"yellow",
+   31:"green", 32:"green", 34:"green",
+   37:"dblue", 39:"dblue",
+}
+GROUP_MEMBERS = {}
+for pos, grp in COLOR_GROUPS.items():
+    GROUP_MEMBERS.setdefault(grp, []).append(pos)
+
+HOUSE_PRICE = {"brown":50,"cyan":50,"pink":100,"orange":100,"red":150,"yellow":150,"green":200,"dblue":200}
 SPECIAL = {0:"DÉPART",2:"Caisse",4:"Taxes -200$",7:"Chance",10:"Prison",
            17:"Caisse",20:"Parc Gratuit",22:"Chance",30:"→Prison",33:"Caisse",
            36:"Chance",38:"Luxe -100$"}
@@ -80,7 +108,7 @@ def new_room(rid):
         "players": {}, "order": [], "turn": 0, "started": False, "owned": {},
         "pending_buy": None, "pending_trade": None,
         "chance_deck": chance, "community_deck": community,
-        "goojf": {},  # pid -> count
+        "goojf": {}, "houses": {},  # pos -> 1-4 (maisons) ou 5 (hôtel)
     }
     conns[rid] = set()
 
@@ -215,7 +243,13 @@ def do_move(rid, pid):
                 both = all(room["owned"].get(u) == owner for u in (12, 28))
                 rent = roll * (10 if both else 4)
             else:
-                rent = p["rent"]
+                h = room.get("houses", {}).get(new_pos, 0)
+                base_rent = p["rents"][h]
+                # Double loyer si monopole sans maisons
+                grp = COLOR_GROUPS.get(new_pos)
+                if h == 0 and grp and all(room["owned"].get(m) == owner for m in GROUP_MEMBERS[grp]):
+                    base_rent *= 2
+                rent = base_rent
             player["money"] -= rent
             o["money"] += rent
             msgs.append(f"💸 Loyer {rent}$ → {o['name']}")
@@ -248,7 +282,8 @@ def get_state(rid):
     return {"event": "state", "players": list(room["players"].values()),
             "turn": cur, "owned": {str(k): v for k, v in room["owned"].items()},
             "started": room["started"], "pending_buy": room.get("pending_buy"),
-            "pending_trade": room.get("pending_trade")}
+            "pending_trade": room.get("pending_trade"),
+            "houses": {str(k): v for k, v in room.get("houses", {}).items()}}
 
 async def broadcast(rid, data):
     dead = set()
@@ -306,6 +341,63 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                     continue
                 room["pending_buy"] = None
                 room["turn"] += 1
+                await broadcast(rid, get_state(rid))
+            elif cmd == "build_house":
+                pos = int(msg.get("pos", -1))
+                grp = COLOR_GROUPS.get(pos)
+                if not grp:
+                    await ws.send_json({"event":"chat","msg":"❌ Pas constructible."})
+                    continue
+                if room["owned"].get(pos) != pid:
+                    await ws.send_json({"event":"chat","msg":"❌ Vous ne possédez pas cette propriété."})
+                    continue
+                if not all(room["owned"].get(m) == pid for m in GROUP_MEMBERS[grp]):
+                    await ws.send_json({"event":"chat","msg":"❌ Vous devez posséder le monopole complet."})
+                    continue
+                houses = room["houses"]
+                current = houses.get(pos, 0)
+                if current >= 5:
+                    await ws.send_json({"event":"chat","msg":"❌ Déjà un hôtel sur cette propriété."})
+                    continue
+                # Construction équitable : ne peut pas avoir plus d'une maison de plus que les autres du groupe
+                max_others = max((houses.get(m, 0) for m in GROUP_MEMBERS[grp] if m != pos), default=0)
+                if current >= max_others + 1:
+                    await ws.send_json({"event":"chat","msg":"❌ Construction doit être équitable entre les propriétés du groupe."})
+                    continue
+                cost = HOUSE_PRICE[grp]
+                if rooms[rid]["players"][pid]["money"] < cost:
+                    await ws.send_json({"event":"chat","msg":f"❌ Pas assez d'argent ({cost}$ requis)."})
+                    continue
+                rooms[rid]["players"][pid]["money"] -= cost
+                houses[pos] = current + 1
+                label = "hôtel" if houses[pos] == 5 else f"{houses[pos]} maison(s)"
+                p_name = PROPERTIES[pos]["name"]
+                await broadcast(rid, {"event":"chat","msg":f"🏗️ {rooms[rid]['players'][pid]['name']} construit sur {p_name} ({label}) pour {cost}$"})
+                await broadcast(rid, get_state(rid))
+            elif cmd == "sell_house":
+                pos = int(msg.get("pos", -1))
+                grp = COLOR_GROUPS.get(pos)
+                if not grp or room["owned"].get(pos) != pid:
+                    await ws.send_json({"event":"chat","msg":"❌ Impossible."})
+                    continue
+                houses = room["houses"]
+                current = houses.get(pos, 0)
+                if current == 0:
+                    await ws.send_json({"event":"chat","msg":"❌ Aucune maison à vendre."})
+                    continue
+                # Vente équitable : ne peut pas vendre si les autres ont moins
+                min_others = min((houses.get(m, 0) for m in GROUP_MEMBERS[grp] if m != pos), default=0)
+                if current <= min_others:
+                    await ws.send_json({"event":"chat","msg":"❌ Vente doit être équitable."})
+                    continue
+                refund = HOUSE_PRICE[grp] // 2
+                rooms[rid]["players"][pid]["money"] += refund
+                if current == 1:
+                    del houses[pos]
+                else:
+                    houses[pos] = current - 1
+                p_name = PROPERTIES[pos]["name"]
+                await broadcast(rid, {"event":"chat","msg":f"💰 {rooms[rid]['players'][pid]['name']} vend une maison sur {p_name} (+{refund}$)"})
                 await broadcast(rid, get_state(rid))
             elif cmd == "trade_offer":
                 to = msg.get("to")

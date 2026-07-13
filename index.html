@@ -81,6 +81,31 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 #chat-in { flex: 1; border: 1px solid #ccc; padding: 4px; font-size: 0.8rem; border-radius: 3px; }
 #chat-btn { background: #222; color: #fff; border: none; padding: 4px 10px; cursor: pointer; border-radius: 3px; }
 
+/* Build modal */
+#build-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 100;
+  align-items: center; justify-content: center;
+}
+#build-overlay.open { display: flex; }
+#build-modal {
+  background: #fff; border-radius: 6px; padding: 20px;
+  width: 420px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+#build-modal h2 { font-size: 1.1rem; margin-bottom: 14px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+.build-group { margin-bottom: 14px; }
+.build-group h3 { font-size: 0.85rem; font-weight: bold; margin-bottom: 6px; text-transform: capitalize; }
+.build-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; padding: 4px 0; border-bottom: 1px solid #f5f5f5; }
+.build-row .prop-name { flex: 1; }
+.build-row .house-count { width: 80px; text-align: center; }
+.build-row .build-btns { display: flex; gap: 4px; }
+.build-row button { padding: 2px 10px; border: 1px solid #aaa; border-radius: 3px; cursor: pointer; background: #f5f5f5; font-size: 0.82rem; }
+.build-row button.sell { background: #ffeaea; }
+.build-row button.buy  { background: #eaffea; }
+#build-modal .close-btn { margin-top: 14px; padding: 7px 16px; border-radius: 3px; border: 1px solid #aaa; cursor: pointer; font-size: 0.88rem; background: #f5f5f5; }
+.houses-display { position: absolute; bottom: 1px; left: 2px; font-size: 0.6rem; color: #2a7a2a; font-weight: bold; line-height: 1; }
+
 /* Trade */
 #trade-overlay {
   display: none; position: fixed; inset: 0;
@@ -146,6 +171,7 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
       <button id="btn-buy"   onclick="send('buy')"   disabled>Acheter la propriété</button>
       <button id="btn-skip"  onclick="send('skip_buy')" disabled>Passer</button>
       <button id="btn-trade" onclick="openTrade()" disabled>🤝 Proposer un échange</button>
+      <button id="btn-build" onclick="openBuild()" disabled>🏗️ Construire / Vendre</button>
     </div>
     <div id="trade-incoming">
       <h4>🤝 Échange proposé</h4>
@@ -164,6 +190,14 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
         <button id="chat-btn" onclick="chat()">Envoyer</button>
       </div>
     </div>
+  </div>
+</div>
+
+<div id="build-overlay">
+  <div id="build-modal">
+    <h2>🏗️ Construire / Vendre des maisons</h2>
+    <div id="build-groups"></div>
+    <button class="close-btn" onclick="closeBuild()">Fermer</button>
   </div>
 </div>
 
@@ -217,7 +251,6 @@ const SPEC = {0:"DÉPART",2:"Caisse",4:"Taxes",7:"Chance",8:"Vermont",10:"Prison
               30:"→Prison",32:"Caroline N.",33:"Caisse",36:"Chance",38:"Luxe"};
 
 // Grid positions: (col, row) 1-indexed
-// GO top-left → Prison top-right → bottom-right → bottom-left → up left side
 const POS = {};
 for(let i=0;i<=10;i++)  POS[i]=[i+1, 1];          // rangée du haut, gauche→droite
 for(let i=11;i<=20;i++) POS[i]=[11, i-10+1];       // colonne droite, haut→bas
@@ -272,6 +305,7 @@ function render(s){
   document.getElementById('btn-buy').disabled   = !canBuy;
   document.getElementById('btn-skip').disabled  = !canBuy;
   document.getElementById('btn-trade').disabled = !s.started || s.players.filter(p=>p.id!==myPid&&!p.bankrupt).length===0;
+  document.getElementById('btn-build').disabled = !s.started;
   renderIncomingTrade(s.pending_trade, s.players);
   // Pions
   document.querySelectorAll('.pions').forEach(e=>e.textContent='');
@@ -279,6 +313,14 @@ function render(s){
   // Owned
   document.querySelectorAll('.sq').forEach(e=>e.classList.remove('owned'));
   Object.keys(s.owned).forEach(k=>{ const sq=document.querySelector(`[data-i="${k}"]`); if(sq) sq.classList.add('owned'); });
+  // Houses
+  document.querySelectorAll('.houses-display').forEach(e=>e.remove());
+  Object.entries(s.houses||{}).forEach(([k,n])=>{
+    const sq=document.querySelector(`[data-i="${k}"]`); if(!sq) return;
+    const el=document.createElement('div'); el.className='houses-display';
+    el.textContent = n===5 ? '🏨' : '🏠'.repeat(n);
+    sq.appendChild(el);
+  });
 }
 
 function log(msg){
@@ -292,6 +334,59 @@ function chat(){ const i=document.getElementById('chat-in'); if(!i.value.trim())
 
 const PROP_NAMES = {};
 Object.entries(PROPS).forEach(([k,v])=> PROP_NAMES[k]=v.n);
+
+const COLOR_GROUPS = {
+  1:"brown",3:"brown",
+  6:"cyan",8:"cyan",9:"cyan",
+  11:"pink",13:"pink",14:"pink",
+  16:"orange",18:"orange",19:"orange",
+  21:"red",23:"red",24:"red",
+  26:"yellow",27:"yellow",29:"yellow",
+  31:"green",32:"green",34:"green",
+  37:"dblue",39:"dblue"
+};
+const GROUP_MEMBERS = {};
+for(const [pos,grp] of Object.entries(COLOR_GROUPS)){
+  if(!GROUP_MEMBERS[grp]) GROUP_MEMBERS[grp]=[];
+  GROUP_MEMBERS[grp].push(parseInt(pos));
+}
+const HOUSE_PRICE = {brown:50,cyan:50,pink:100,orange:100,red:150,yellow:150,green:200,dblue:200};
+const GROUP_LABEL = {brown:"Marron",cyan:"Bleu clair",pink:"Rose",orange:"Orange",red:"Rouge",yellow:"Jaune",green:"Vert",dblue:"Bleu foncé"};
+
+function houseLabel(n){ return n===5?"🏨 Hôtel":"🏠".repeat(n)||"—"; }
+
+function openBuild(){
+  if(!gs) return;
+  const myOwned = Object.entries(gs.owned).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
+  // Find complete groups I own
+  const myGroups = [...new Set(myOwned.map(p=>COLOR_GROUPS[p]).filter(Boolean))]
+    .filter(grp => GROUP_MEMBERS[grp].every(p => gs.owned[p]===myPid));
+
+  const container = document.getElementById('build-groups');
+  if(!myGroups.length){
+    container.innerHTML = '<p style="color:#888;font-size:.85rem">Vous ne possédez aucun monopole complet.</p>';
+  } else {
+    container.innerHTML = myGroups.map(grp => {
+      const price = HOUSE_PRICE[grp];
+      const rows = GROUP_MEMBERS[grp].map(pos => {
+        const n = parseInt(gs.houses[pos]||0);
+        return `<div class="build-row">
+          <span class="prop-name">${PROP_NAMES[pos]}</span>
+          <span class="house-count">${houseLabel(n)}</span>
+          <div class="build-btns">
+            <button class="sell" onclick="ws?.send(JSON.stringify({cmd:'sell_house',pos:${pos}}));setTimeout(refreshBuild,200)">-</button>
+            <button class="buy"  onclick="ws?.send(JSON.stringify({cmd:'build_house',pos:${pos}}));setTimeout(refreshBuild,200)">+ ${price}$</button>
+          </div>
+        </div>`;
+      }).join('');
+      return `<div class="build-group"><h3>${GROUP_LABEL[grp]}</h3>${rows}</div>`;
+    }).join('');
+  }
+  document.getElementById('build-overlay').classList.add('open');
+}
+
+function refreshBuild(){ if(gs) openBuild(); }
+function closeBuild(){ document.getElementById('build-overlay').classList.remove('open'); }
 
 function openTrade(){
   if(!gs) return;
