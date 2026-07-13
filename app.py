@@ -1,4 +1,4 @@
-import json, random, uuid
+import json, random, uuid, asyncio, time
 from pathlib import Path
 from typing import Dict, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -276,6 +276,19 @@ def do_buy(rid, pid):
     room["owned"][pos] = pid
     return f"✅ {player['name']} achète {p['name']} pour {p['price']}$"
 
+def get_auction_state(room):
+    a = room.get("pending_auction")
+    if not a:
+        return None
+    return {
+        "pos": a["pos"],
+        "pos_name": PROPERTIES[a["pos"]]["name"],
+        "from_pid": a["from_pid"],
+        "deadline": a["deadline"],
+        "eligible": a["eligible"],
+        "submitted": list(a["bids"].keys()),
+    }
+
 def get_state(rid):
     room = rooms[rid]
     cur = room["order"][room["turn"] % len(room["order"])] if room["order"] else None
@@ -283,7 +296,39 @@ def get_state(rid):
             "turn": cur, "owned": {str(k): v for k, v in room["owned"].items()},
             "started": room["started"], "pending_buy": room.get("pending_buy"),
             "pending_trade": room.get("pending_trade"),
-            "houses": {str(k): v for k, v in room.get("houses", {}).items()}}
+            "houses": {str(k): v for k, v in room.get("houses", {}).items()},
+            "pending_auction": get_auction_state(room)}
+
+async def end_auction(rid):
+    room = rooms.get(rid)
+    if not room or not room.get("pending_auction"):
+        return
+    a = room["pending_auction"]
+    room["pending_auction"] = None
+    bids = a["bids"]  # pid -> amount
+    # Fill missing bids as 0
+    for p in a["eligible"]:
+        if p not in bids:
+            bids[p] = 0
+    if not bids or all(v == 0 for v in bids.values()):
+        await broadcast(rid, {"event": "chat", "msg": f"🔨 Enchère terminée — aucune offre. {PROPERTIES[a['pos']]['name']} reste disponible."})
+        room["turn"] += 1
+        await broadcast(rid, get_state(rid))
+        return
+    winner_pid = max(bids, key=lambda p: bids[p])
+    winner_amount = bids[winner_pid]
+    winner = room["players"][winner_pid]
+    # Reveal all bids
+    reveal = " | ".join(f"{room['players'][p]['icon']} {room['players'][p]['name']}: {bids[p]}$" for p in bids)
+    await broadcast(rid, {"event": "chat", "msg": f"🔨 Résultats enchère : {reveal}"})
+    if winner["money"] < winner_amount:
+        await broadcast(rid, {"event": "chat", "msg": f"❌ {winner['name']} n'a pas assez d'argent. Terrain non vendu."})
+    else:
+        winner["money"] -= winner_amount
+        room["owned"][a["pos"]] = winner_pid
+        await broadcast(rid, {"event": "chat", "msg": f"🏆 {winner['name']} remporte {PROPERTIES[a['pos']]['name']} pour {winner_amount}$!"})
+    room["turn"] += 1
+    await broadcast(rid, get_state(rid))
 
 async def broadcast(rid, data):
     dead = set()
@@ -336,12 +381,45 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 room["pending_buy"] = None
                 room["turn"] += 1
                 await broadcast(rid, get_state(rid))
-            elif cmd == "skip_buy":
+            elif cmd == "auction":
                 if room.get("pending_buy") != pid:
                     continue
+                pos = rooms[rid]["players"][pid]["pos"]
                 room["pending_buy"] = None
-                room["turn"] += 1
+                eligible = [p for p in room["order"] if p != pid and not room["players"][p]["bankrupt"]]
+                room["pending_auction"] = {
+                    "pos": pos,
+                    "from_pid": pid,
+                    "eligible": eligible,
+                    "bids": {},
+                    "deadline": time.time() + 60,
+                    "task": None,
+                }
+                p_name = PROPERTIES[pos]["name"]
+                await broadcast(rid, {"event": "chat", "msg": f"🔨 Enchère lancée pour {p_name}! 60 secondes pour miser."})
                 await broadcast(rid, get_state(rid))
+                task = asyncio.create_task(asyncio.sleep(60))
+                room["pending_auction"]["task"] = task
+                async def run_auction(r=rid, t=task):
+                    try:
+                        await t
+                        await end_auction(r)
+                    except asyncio.CancelledError:
+                        pass
+                asyncio.create_task(run_auction())
+            elif cmd == "bid":
+                a = room.get("pending_auction")
+                if not a or pid not in a["eligible"] or pid in a["bids"]:
+                    continue
+                amount = max(0, int(msg.get("amount", 0)))
+                a["bids"][pid] = amount
+                label = f"{amount}$" if amount > 0 else "passe"
+                await broadcast(rid, {"event": "chat", "msg": f"📝 {room['players'][pid]['name']} a misé ({label})."})
+                await broadcast(rid, get_state(rid))
+                if set(a["eligible"]) == set(a["bids"].keys()):
+                    if a.get("task"):
+                        a["task"].cancel()
+                    await end_auction(rid)
             elif cmd == "build_house":
                 pos = int(msg.get("pos", -1))
                 grp = COLOR_GROUPS.get(pos)

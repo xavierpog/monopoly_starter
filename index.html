@@ -81,6 +81,21 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 #chat-in { flex: 1; border: 1px solid #ccc; padding: 4px; font-size: 0.8rem; border-radius: 3px; }
 #chat-btn { background: #222; color: #fff; border: none; padding: 4px 10px; cursor: pointer; border-radius: 3px; }
 
+/* Auction panel */
+#auction-panel {
+  display: none; background: #fff8e1; border: 2px solid #f9a825;
+  border-radius: 4px; padding: 10px; font-size: 0.82rem;
+}
+#auction-panel.open { display: block; }
+#auction-panel h4 { font-size: 0.92rem; margin-bottom: 6px; }
+#auction-timer { font-weight: bold; color: #c62828; font-size: 1rem; }
+#auction-waiting { color: #888; font-style: italic; margin-top: 6px; }
+#auction-bid-row { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+#auction-bid-row input { flex:1; padding: 4px 6px; border: 1px solid #ccc; border-radius: 3px; font-size: 0.85rem; }
+#auction-bid-row button { padding: 4px 10px; border-radius: 3px; border: 1px solid #aaa; cursor: pointer; font-size: 0.82rem; background: #f5f5f5; }
+#auction-bid-row button.submit { background: #1565c0; color: #fff; border-color: #1565c0; }
+#auction-submitted { color: #2a7a2a; margin-top: 6px; font-weight: bold; }
+
 /* Build modal */
 #build-overlay {
   display: none; position: fixed; inset: 0;
@@ -169,10 +184,22 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
       <button id="btn-start" onclick="send('start')">Démarrer (2 joueurs min.)</button>
       <button id="btn-roll"  onclick="send('roll')"  disabled>Lancer les dés</button>
       <button id="btn-buy"   onclick="send('buy')"   disabled>Acheter la propriété</button>
-      <button id="btn-skip"  onclick="send('skip_buy')" disabled>Passer</button>
+      <button id="btn-skip"  onclick="send('auction')" disabled>🔨 Enchère</button>
       <button id="btn-trade" onclick="openTrade()" disabled>🤝 Proposer un échange</button>
       <button id="btn-build" onclick="openBuild()" disabled>🏗️ Construire / Vendre</button>
     </div>
+    <div id="auction-panel">
+      <h4>🔨 Enchère en cours : <span id="auction-prop"></span></h4>
+      <div>Temps restant : <span id="auction-timer">60</span>s</div>
+      <div id="auction-waiting"></div>
+      <div id="auction-bid-row">
+        <input type="number" id="auction-amount" min="0" placeholder="Votre mise ($)" />
+        <button class="submit" onclick="submitBid()">Miser</button>
+        <button onclick="submitBid(0)">Sauter</button>
+      </div>
+      <div id="auction-submitted"></div>
+    </div>
+
     <div id="trade-incoming">
       <h4>🤝 Échange proposé</h4>
       <div id="ti-details"></div>
@@ -300,15 +327,20 @@ function render(s){
   ).join('');
   // Buttons
   const canBuy = s.pending_buy === myPid;
+  const me = s.players.find(p => p.id === myPid);
+  const myPos = me?.pos;
+  const propPrice = canBuy && myPos != null ? (PROPS[myPos]?.price ?? 0) : 0;
+  const canAfford = me && me.money >= propPrice;
   document.getElementById('btn-start').disabled = s.started || s.players.length < 2;
   document.getElementById('btn-roll').disabled  = !s.started || !isMyTurn || canBuy;
-  document.getElementById('btn-buy').disabled   = !canBuy;
+  document.getElementById('btn-buy').disabled   = !canBuy || !canAfford;
   document.getElementById('btn-skip').disabled  = !canBuy;
   document.getElementById('btn-trade').disabled = !s.started || s.players.filter(p=>p.id!==myPid&&!p.bankrupt).length===0;
   const myOwned = Object.entries(s.owned||{}).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
   const hasMonopoly = Object.keys(GROUP_MEMBERS).some(grp=>GROUP_MEMBERS[grp].every(p=>s.owned[p]===myPid));
   document.getElementById('btn-build').disabled = !s.started || !hasMonopoly;
   renderIncomingTrade(s.pending_trade, s.players);
+  renderAuction(s.pending_auction, s.players);
   // Pions
   document.querySelectorAll('.pions').forEach(e=>e.textContent='');
   s.players.forEach(p=>{ const el=document.getElementById(`p${p.pos}`); if(el) el.textContent+=p.icon; });
@@ -389,6 +421,59 @@ function openBuild(){
 
 function refreshBuild(){ if(gs) openBuild(); }
 function closeBuild(){ document.getElementById('build-overlay').classList.remove('open'); }
+
+let auctionInterval = null;
+
+function renderAuction(a, players) {
+  const panel = document.getElementById('auction-panel');
+  if (!a) {
+    panel.classList.remove('open');
+    if (auctionInterval) { clearInterval(auctionInterval); auctionInterval = null; }
+    return;
+  }
+  panel.classList.add('open');
+  document.getElementById('auction-prop').textContent = a.pos_name;
+
+  // Timer
+  if (auctionInterval) clearInterval(auctionInterval);
+  auctionInterval = setInterval(() => {
+    const secs = Math.max(0, Math.round(a.deadline - Date.now() / 1000));
+    document.getElementById('auction-timer').textContent = secs;
+    if (secs === 0) { clearInterval(auctionInterval); auctionInterval = null; }
+  }, 500);
+
+  const iAmEligible = a.eligible.includes(myPid);
+  const iAlreadyBid = a.submitted.includes(myPid);
+  const bidRow = document.getElementById('auction-bid-row');
+  const submitted = document.getElementById('auction-submitted');
+  const waiting = document.getElementById('auction-waiting');
+
+  // Who hasn't bid yet
+  const pending = a.eligible.filter(p => !a.submitted.includes(p))
+    .map(p => { const pl = players.find(x => x.id === p); return pl ? `${pl.icon} ${pl.name}` : p; });
+
+  if (!iAmEligible) {
+    // I'm the one who triggered the auction — just watch
+    bidRow.style.display = 'none';
+    submitted.textContent = '';
+    waiting.textContent = pending.length ? `En attente de : ${pending.join(', ')}` : 'Toutes les mises reçues…';
+  } else if (iAlreadyBid) {
+    bidRow.style.display = 'none';
+    submitted.textContent = '✅ Mise soumise — en attente des autres.';
+    waiting.textContent = pending.length ? `En attente de : ${pending.join(', ')}` : 'Toutes les mises reçues…';
+  } else {
+    bidRow.style.display = 'flex';
+    submitted.textContent = '';
+    waiting.textContent = pending.length > 1 ? `En attente aussi de : ${pending.filter(p=>p!==myPid).join(', ')}` : '';
+  }
+}
+
+function submitBid(forced) {
+  const amount = forced === 0 ? 0 : Math.max(0, parseInt(document.getElementById('auction-amount').value) || 0);
+  ws?.send(JSON.stringify({ cmd: 'bid', amount }));
+  document.getElementById('auction-bid-row').style.display = 'none';
+  document.getElementById('auction-submitted').textContent = amount === 0 ? '✅ Vous avez passé.' : `✅ Mise de ${amount}$ soumise.`;
+}
 
 function openTrade(){
   if(!gs) return;
