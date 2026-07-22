@@ -108,7 +108,7 @@ def new_room(rid):
         "players": {}, "order": [], "turn": 0, "started": False, "owned": {},
         "pending_buy": None, "pending_trade": None,
         "chance_deck": chance, "community_deck": community,
-        "goojf": {}, "houses": {}, "game_over": False, "winner": None,
+        "goojf": {}, "houses": {}, "game_over": False, "winner": None, "extra_roll": None,
     }
     conns[rid] = set()
 
@@ -215,6 +215,9 @@ def do_move(rid, pid):
     msgs = [f"🎲 {player['name']} fait {d1}+{d2}{'  🎯 Double!' if doubles else ''}"]
     pending_buy_pos = None
 
+    was_in_jail = player["in_jail"]
+    can_roll_again = False
+
     # --- Cas : joueur en prison ---
     if player["in_jail"]:
         if doubles:
@@ -222,6 +225,7 @@ def do_move(rid, pid):
             player["jail_turns"] = 0
             player["doubles_streak"] = 0
             msgs.append("🔓 Double! Vous sortez de prison!")
+            # pas de relancer après sortie de prison
         else:
             player["jail_turns"] += 1
             if player["jail_turns"] >= 3:
@@ -231,7 +235,7 @@ def do_move(rid, pid):
                 msgs.append("🚔 3 tours en prison — 50$ payés automatiquement, vous sortez.")
             else:
                 msgs.append(f"🚔 Pas de double — vous restez en prison ({player['jail_turns']}/3 tours).")
-                return msgs, None  # tour terminé, pas de déplacement
+                return msgs, None, False
     else:
         # --- Vérifier 3 doubles consécutifs ---
         if doubles:
@@ -241,7 +245,9 @@ def do_move(rid, pid):
                 player["in_jail"] = True
                 player["doubles_streak"] = 0
                 msgs.append("🚔 3 doubles de suite — En prison!")
-                return msgs, None
+                return msgs, None, False
+            else:
+                can_roll_again = True
         else:
             player["doubles_streak"] = 0
 
@@ -276,10 +282,12 @@ def do_move(rid, pid):
             if p.get("utility"):
                 both = all(room["owned"].get(u) == owner for u in (12, 28))
                 rent = roll * (10 if both else 4)
+            elif new_pos in RAILROADS:
+                count = sum(1 for r in RAILROADS if room["owned"].get(r) == owner)
+                rent = 25 * (2 ** (count - 1))  # 25, 50, 100, 200
             else:
                 h = room.get("houses", {}).get(new_pos, 0)
                 base_rent = p["rents"][h]
-                # Double loyer si monopole sans maisons
                 grp = COLOR_GROUPS.get(new_pos)
                 if h == 0 and grp and all(room["owned"].get(m) == owner for m in GROUP_MEMBERS[grp]):
                     base_rent *= 2
@@ -300,7 +308,7 @@ def do_move(rid, pid):
             player["money"] -= 100
             if player["money"] <= 0: msgs += do_bankruptcy(rid, pid)
 
-    return msgs, pending_buy_pos
+    return msgs, pending_buy_pos, can_roll_again
 
 def do_bankruptcy(rid, pid):
     room = rooms[rid]
@@ -355,14 +363,20 @@ def get_auction_state(room):
 def get_state(rid):
     room = rooms[rid]
     cur = room["order"][room["turn"] % len(room["order"])] if room["order"] else None
-    return {"event": "state", "players": list(room["players"].values()),
+    players_out = []
+    for p in room["players"].values():
+        pc = dict(p)
+        pc["goojf"] = room["goojf"].get(p["id"], 0)
+        players_out.append(pc)
+    return {"event": "state", "players": players_out,
             "turn": cur, "owned": {str(k): v for k, v in room["owned"].items()},
             "started": room["started"], "pending_buy": room.get("pending_buy"),
             "pending_trade": room.get("pending_trade"),
             "houses": {str(k): v for k, v in room.get("houses", {}).items()},
             "pending_auction": get_auction_state(room),
         "game_over": room.get("game_over", False),
-        "winner": room.get("winner")}
+        "winner": room.get("winner"),
+        "extra_roll": room.get("extra_roll")}
 
 async def end_auction(rid):
     room = rooms.get(rid)
@@ -430,12 +444,17 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 if pid != cur:
                     await ws.send_json({"event": "chat", "msg": "⚠️ Pas votre tour."})
                     continue
-                msgs, pending_buy_pos = do_move(rid, pid)
+                msgs, pending_buy_pos, can_roll_again = do_move(rid, pid)
                 for m in msgs:
                     await broadcast(rid, {"event": "chat", "msg": m})
                 if pending_buy_pos is not None and pending_buy_pos not in room["owned"]:
                     room["pending_buy"] = pid
+                    room["extra_roll"] = pid if can_roll_again else None
+                elif can_roll_again:
+                    room["extra_roll"] = pid
+                    await broadcast(rid, {"event": "chat", "msg": "🎯 Double! Vous relancez les dés."})
                 else:
+                    room["extra_roll"] = None
                     room["turn"] += 1
                 await broadcast(rid, get_state(rid))
             elif cmd == "buy":
@@ -444,7 +463,28 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                     continue
                 await broadcast(rid, {"event": "chat", "msg": do_buy(rid, pid)})
                 room["pending_buy"] = None
-                room["turn"] += 1
+                if room.get("extra_roll") == pid:
+                    room["extra_roll"] = None
+                    await broadcast(rid, {"event": "chat", "msg": "🎯 Double! Vous relancez les dés."})
+                else:
+                    room["turn"] += 1
+                await broadcast(rid, get_state(rid))
+            elif cmd == "use_goojf":
+                cur = room["order"][room["turn"] % len(room["order"])]
+                if pid != cur:
+                    await ws.send_json({"event":"chat","msg":"⚠️ Pas votre tour."})
+                    continue
+                player = room["players"][pid]
+                if not player["in_jail"]:
+                    await ws.send_json({"event":"chat","msg":"❌ Vous n'êtes pas en prison."})
+                    continue
+                if room["goojf"].get(pid, 0) < 1:
+                    await ws.send_json({"event":"chat","msg":"❌ Vous n'avez pas de carte Sortie de Prison."})
+                    continue
+                room["goojf"][pid] -= 1
+                player["in_jail"] = False
+                player["jail_turns"] = 0
+                await broadcast(rid, {"event":"chat","msg":f"🎫 {player['name']} utilise sa carte Sortie de Prison!"})
                 await broadcast(rid, get_state(rid))
             elif cmd == "pay_jail":
                 cur = room["order"][room["turn"] % len(room["order"])]
@@ -468,6 +508,7 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                     continue
                 pos = rooms[rid]["players"][pid]["pos"]
                 room["pending_buy"] = None
+                room["extra_roll"] = None
                 eligible = [p for p in room["order"] if p != pid and not room["players"][p]["bankrupt"]]
                 room["pending_auction"] = {
                     "pos": pos,
