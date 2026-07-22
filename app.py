@@ -106,9 +106,10 @@ def new_room(rid):
     random.shuffle(community)
     rooms[rid] = {
         "players": {}, "order": [], "turn": 0, "started": False, "owned": {},
-        "pending_buy": None, "pending_trade": None,
+        "pending_buy": None, "pending_trade": None, "pending_tax": None,
         "chance_deck": chance, "community_deck": community,
-        "goojf": {}, "houses": {}, "game_over": False, "winner": None, "extra_roll": None,
+        "goojf": {}, "houses": {}, "mortgaged": {},
+        "game_over": False, "winner": None, "extra_roll": None,
     }
     conns[rid] = set()
 
@@ -179,11 +180,15 @@ def apply_card(rid, pid, card, roll):
         player["pos"] = dest
         owner = room["owned"].get(dest)
         if owner and owner != pid:
-            rent = PROPERTIES[dest]["rent"] * 2
-            player["money"] -= rent; room["players"][owner]["money"] += rent
-            msgs.append(f"💸 Double loyer {rent}$ → {room['players'][owner]['name']}")
-            if player["money"] <= 0:
-                msgs += do_bankruptcy(rid, pid)
+            if room.get("mortgaged", {}).get(dest):
+                msgs.append(f"🏦 Gare hypothéquée — pas de loyer.")
+            else:
+                count = sum(1 for r in RAILROADS if room["owned"].get(r) == owner and not room.get("mortgaged", {}).get(r))
+                rent = 25 * (2 ** count)  # double from Chance card
+                player["money"] -= rent; room["players"][owner]["money"] += rent
+                msgs.append(f"💸 Double loyer gare {rent}$ → {room['players'][owner]['name']}")
+                if player["money"] <= 0:
+                    msgs += do_bankruptcy(rid, pid)
         elif owner is None:
             msgs.append(f"🏠 {PROPERTIES[dest]['name']} à vendre — cliquez Acheter")
             return msgs, dest
@@ -194,11 +199,14 @@ def apply_card(rid, pid, card, roll):
         player["pos"] = dest
         owner = room["owned"].get(dest)
         if owner and owner != pid:
-            rent = roll * 10
-            player["money"] -= rent; room["players"][owner]["money"] += rent
-            msgs.append(f"💸 {rent}$ (10× dés) → {room['players'][owner]['name']}")
-            if player["money"] <= 0:
-                msgs += do_bankruptcy(rid, pid)
+            if room.get("mortgaged", {}).get(dest):
+                msgs.append(f"🏦 Service hypothéqué — pas de loyer.")
+            else:
+                rent = roll * 10
+                player["money"] -= rent; room["players"][owner]["money"] += rent
+                msgs.append(f"💸 {rent}$ (10× dés) → {room['players'][owner]['name']}")
+                if player["money"] <= 0:
+                    msgs += do_bankruptcy(rid, pid)
         elif owner is None:
             msgs.append(f"🏠 {PROPERTIES[dest]['name']} à vendre — cliquez Acheter")
             return msgs, dest
@@ -285,34 +293,39 @@ def do_move(rid, pid):
             msgs.append(f"🏠 {p['name']} à vendre ({p['price']}$) — cliquez Acheter")
             pending_buy_pos = new_pos
         elif owner != pid:
-            o = room["players"][owner]
-            if p.get("utility"):
-                both = all(room["owned"].get(u) == owner for u in (12, 28))
-                rent = roll * (10 if both else 4)
-            elif new_pos in RAILROADS:
-                count = sum(1 for r in RAILROADS if room["owned"].get(r) == owner)
-                rent = 25 * (2 ** (count - 1))  # 25, 50, 100, 200
+            if room.get("mortgaged", {}).get(new_pos):
+                msgs.append(f"🏦 {p['name']} est hypothéquée — pas de loyer.")
             else:
-                h = room.get("houses", {}).get(new_pos, 0)
-                base_rent = p["rents"][h]
-                grp = COLOR_GROUPS.get(new_pos)
-                if h == 0 and grp and all(room["owned"].get(m) == owner for m in GROUP_MEMBERS[grp]):
-                    base_rent *= 2
-                rent = base_rent
-            player["money"] -= rent
-            o["money"] += rent
-            msgs.append(f"💸 Loyer {rent}$ → {o['name']}")
-            if player["money"] <= 0:
-                msgs += do_bankruptcy(rid, pid)
+                o = room["players"][owner]
+                if p.get("utility"):
+                    non_mort = sum(1 for u in (12, 28) if room["owned"].get(u) == owner and not room.get("mortgaged", {}).get(u))
+                    rent = roll * (10 if non_mort == 2 else 4)
+                elif new_pos in RAILROADS:
+                    count = sum(1 for r in RAILROADS if room["owned"].get(r) == owner and not room.get("mortgaged", {}).get(r))
+                    rent = 25 * (2 ** (count - 1))
+                else:
+                    h = room.get("houses", {}).get(new_pos, 0)
+                    base_rent = p["rents"][h]
+                    grp = COLOR_GROUPS.get(new_pos)
+                    if h == 0 and grp and all(room["owned"].get(m) == owner for m in GROUP_MEMBERS[grp]):
+                        if not any(room.get("mortgaged", {}).get(m) for m in GROUP_MEMBERS[grp]):
+                            base_rent *= 2
+                    rent = base_rent
+                player["money"] -= rent
+                o["money"] += rent
+                msgs.append(f"💸 Loyer {rent}$ → {o['name']}")
+                if player["money"] <= 0:
+                    msgs += do_bankruptcy(rid, pid)
         else:
             msgs.append(f"🏠 Votre propriété : {p['name']}")
     elif new_pos in SPECIAL:
         msgs.append(f"⭐ {SPECIAL[new_pos]}")
         if new_pos == 4:
-            player["money"] -= 200
-            if player["money"] <= 0: msgs += do_bankruptcy(rid, pid)
+            room["pending_tax"] = pid
+            msgs.append("⚠️ Choisissez : Payer 200$ (fixe) ou 10% de vos avoirs totaux.")
         elif new_pos == 38:
             player["money"] -= 100
+            msgs.append(f"💸 Taxe de luxe : 100$ payés.")
             if player["money"] <= 0: msgs += do_bankruptcy(rid, pid)
 
     return msgs, pending_buy_pos, can_roll_again
@@ -326,6 +339,10 @@ def do_bankruptcy(rid, pid):
     for pos in list(room.get("houses", {}).keys()):
         if room["owned"].get(pos) == pid:
             del room["houses"][pos]
+    # Lever les hypothèques (les propriétés retournent à la banque sans dette)
+    for pos in list(room.get("mortgaged", {}).keys()):
+        if room["owned"].get(pos) == pid:
+            del room["mortgaged"][pos]
     # Retourner les propriétés à la banque
     for pos in list(room["owned"].keys()):
         if room["owned"][pos] == pid:
@@ -378,12 +395,13 @@ def get_state(rid):
     return {"event": "state", "players": players_out,
             "turn": cur, "owned": {str(k): v for k, v in room["owned"].items()},
             "started": room["started"], "pending_buy": room.get("pending_buy"),
-            "pending_trade": room.get("pending_trade"),
+            "pending_trade": room.get("pending_trade"), "pending_tax": room.get("pending_tax"),
             "houses": {str(k): v for k, v in room.get("houses", {}).items()},
+            "mortgaged": {str(k): v for k, v in room.get("mortgaged", {}).items()},
             "pending_auction": get_auction_state(room),
-        "game_over": room.get("game_over", False),
-        "winner": room.get("winner"),
-        "extra_roll": room.get("extra_roll")}
+            "game_over": room.get("game_over", False),
+            "winner": room.get("winner"),
+            "extra_roll": room.get("extra_roll")}
 
 async def end_auction(rid):
     room = rooms.get(rid)
@@ -451,10 +469,16 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 if pid != cur:
                     await ws.send_json({"event": "chat", "msg": "⚠️ Pas votre tour."})
                     continue
+                if room.get("pending_tax") == pid:
+                    await ws.send_json({"event": "chat", "msg": "⚠️ Payez vos taxes d'abord."})
+                    continue
                 msgs, pending_buy_pos, can_roll_again = do_move(rid, pid)
                 for m in msgs:
                     await broadcast(rid, {"event": "chat", "msg": m})
-                if pending_buy_pos is not None and pending_buy_pos not in room["owned"]:
+                if room.get("pending_tax") == pid:
+                    if can_roll_again:
+                        room["extra_roll"] = pid
+                elif pending_buy_pos is not None and pending_buy_pos not in room["owned"]:
                     room["pending_buy"] = pid
                     room["extra_roll"] = pid if can_roll_again else None
                 elif can_roll_again:
@@ -661,6 +685,89 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                     continue
                 room["pending_trade"] = None
                 await broadcast(rid, {"event": "chat", "msg": f"❌ Échange refusé par {room['players'][pid]['name']}."})
+                await broadcast(rid, get_state(rid))
+            elif cmd == "tax_flat":
+                if room.get("pending_tax") != pid:
+                    continue
+                player = room["players"][pid]
+                player["money"] -= 200
+                room["pending_tax"] = None
+                await broadcast(rid, {"event": "chat", "msg": f"💸 {player['name']} paie 200$ de taxe sur le revenu."})
+                if player["money"] <= 0:
+                    for m in do_bankruptcy(rid, pid): await broadcast(rid, {"event": "chat", "msg": m})
+                elif room.get("extra_roll") == pid:
+                    room["extra_roll"] = None
+                    await broadcast(rid, {"event": "chat", "msg": "🎯 Double! Vous relancez les dés."})
+                else:
+                    room["turn"] += 1
+                await broadcast(rid, get_state(rid))
+            elif cmd == "tax_pct":
+                if room.get("pending_tax") != pid:
+                    continue
+                player = room["players"][pid]
+                wealth = player["money"]
+                for pos, owner in room["owned"].items():
+                    if owner == pid:
+                        pos_i = int(pos) if isinstance(pos, str) else pos
+                        if pos_i in PROPERTIES:
+                            if room.get("mortgaged", {}).get(pos_i):
+                                wealth += PROPERTIES[pos_i]["price"] // 2
+                            else:
+                                wealth += PROPERTIES[pos_i]["price"]
+                for pos, count in room.get("houses", {}).items():
+                    pos_i = int(pos) if isinstance(pos, str) else pos
+                    grp = COLOR_GROUPS.get(pos_i)
+                    if grp and room["owned"].get(pos_i) == pid:
+                        wealth += count * HOUSE_PRICE[grp]
+                amount = max(1, wealth // 10)
+                player["money"] -= amount
+                room["pending_tax"] = None
+                await broadcast(rid, {"event": "chat", "msg": f"💸 {player['name']} paie {amount}$ (10% de {wealth}$)."})
+                if player["money"] <= 0:
+                    for m in do_bankruptcy(rid, pid): await broadcast(rid, {"event": "chat", "msg": m})
+                elif room.get("extra_roll") == pid:
+                    room["extra_roll"] = None
+                    await broadcast(rid, {"event": "chat", "msg": "🎯 Double! Vous relancez les dés."})
+                else:
+                    room["turn"] += 1
+                await broadcast(rid, get_state(rid))
+            elif cmd == "mortgage":
+                pos = int(msg.get("pos", -1))
+                if room["owned"].get(pos) != pid:
+                    await ws.send_json({"event":"chat","msg":"❌ Vous ne possédez pas cette propriété."})
+                    continue
+                if room.get("mortgaged", {}).get(pos):
+                    await ws.send_json({"event":"chat","msg":"❌ Déjà hypothéquée."})
+                    continue
+                if pos not in PROPERTIES:
+                    await ws.send_json({"event":"chat","msg":"❌ Non hypothécable."})
+                    continue
+                grp = COLOR_GROUPS.get(pos)
+                if grp and any(room.get("houses", {}).get(m, 0) > 0 for m in GROUP_MEMBERS[grp]):
+                    await ws.send_json({"event":"chat","msg":"❌ Vendez toutes les maisons du groupe avant d'hypothéquer."})
+                    continue
+                mortgage_value = PROPERTIES[pos]["price"] // 2
+                room["players"][pid]["money"] += mortgage_value
+                room.setdefault("mortgaged", {})[pos] = True
+                p_name = PROPERTIES[pos]["name"]
+                await broadcast(rid, {"event":"chat","msg":f"🏦 {room['players'][pid]['name']} hypothèque {p_name} (+{mortgage_value}$)."})
+                await broadcast(rid, get_state(rid))
+            elif cmd == "unmortgage":
+                pos = int(msg.get("pos", -1))
+                if room["owned"].get(pos) != pid:
+                    await ws.send_json({"event":"chat","msg":"❌ Vous ne possédez pas cette propriété."})
+                    continue
+                if not room.get("mortgaged", {}).get(pos):
+                    await ws.send_json({"event":"chat","msg":"❌ Cette propriété n'est pas hypothéquée."})
+                    continue
+                unmortgage_cost = int(PROPERTIES[pos]["price"] * 0.55)
+                if room["players"][pid]["money"] < unmortgage_cost:
+                    await ws.send_json({"event":"chat","msg":f"❌ Pas assez d'argent ({unmortgage_cost}$ requis)."})
+                    continue
+                room["players"][pid]["money"] -= unmortgage_cost
+                room["mortgaged"][pos] = False
+                p_name = PROPERTIES[pos]["name"]
+                await broadcast(rid, {"event":"chat","msg":f"🏦 {room['players'][pid]['name']} lève l'hypothèque de {p_name} (-{unmortgage_cost}$)."})
                 await broadcast(rid, get_state(rid))
             elif cmd == "chat":
                 n = room["players"][pid]["name"]

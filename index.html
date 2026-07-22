@@ -111,6 +111,11 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 #auction-bid-row button.submit { background: #1565c0; color: #fff; border-color: #1565c0; }
 #auction-submitted { color: #2a7a2a; margin-top: 6px; font-weight: bold; }
 
+/* Mortgaged squares */
+.sq.mortgaged-sq { opacity: 0.65; }
+.sq.mortgaged-sq .color-bar { filter: grayscale(1); }
+.mortgage-badge { position:absolute; top:1px; left:2px; font-size:0.6rem; }
+
 /* Inventory modal */
 #inventory-overlay {
   display: none; position: fixed; inset: 0;
@@ -127,7 +132,7 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 .inv-group { margin-bottom: 14px; }
 .inv-group h3 { font-size: 0.82rem; font-weight: bold; margin-bottom: 5px; text-transform: capitalize; display: flex; align-items: center; gap: 6px; }
 .inv-group h3 .inv-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
-.inv-row { display: grid; grid-template-columns: 1fr 80px 80px; font-size: 0.78rem; padding: 3px 0; border-bottom: 1px solid #f5f5f5; gap: 4px; align-items: center; }
+.inv-row { display: grid; grid-template-columns: 1fr 65px 140px; font-size: 0.78rem; padding: 3px 0; border-bottom: 1px solid #f5f5f5; gap: 4px; align-items: center; }
 .inv-row.header { font-weight: bold; color: #555; font-size: 0.73rem; }
 #inventory-modal .close-btn { margin-top: 14px; padding: 7px 16px; border-radius: 3px; border: 1px solid #aaa; cursor: pointer; font-size: 0.88rem; background: #f5f5f5; }
 
@@ -224,7 +229,9 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
       <button id="btn-goojf"   onclick="send('use_goojf')" disabled>🎫 Carte Sortie de Prison</button>
       <button id="btn-payjail" onclick="send('pay_jail')" disabled>💰 Payer 50$ (sortir de prison)</button>
       <button id="btn-build"     onclick="openBuild()"     disabled>🏗️ Construire / Vendre</button>
-      <button id="btn-inventory" onclick="openInventory()">📋 Mes propriétés</button>
+      <button id="btn-inventory" onclick="openInventory()">📋 Mes propriétés / Hypothèques</button>
+      <button id="btn-tax-flat" onclick="send('tax_flat')" disabled>💸 Payer 200$ (taxe fixe)</button>
+      <button id="btn-tax-pct"  onclick="send('tax_pct')"  disabled>📊 Payer 10% de mes avoirs</button>
     </div>
     <div id="auction-panel">
       <h4>🔨 Enchère en cours : <span id="auction-prop"></span></h4>
@@ -316,17 +323,17 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 let ws, myPid, gs;
 
 const PROPS = {
-  1:{n:"Méditerranée",c:"brown"},3:{n:"Baltic",c:"brown"},
-  6:{n:"Oriental",c:"cyan"},9:{n:"Connecticut",c:"cyan"},
-  11:{n:"St-Charles",c:"pink"},14:{n:"Virginia",c:"pink"},
-  16:{n:"St-James",c:"orange"},19:{n:"New York",c:"orange"},
-  21:{n:"Kentucky",c:"red"},24:{n:"Illinois",c:"red"},
-  26:{n:"Atlantic",c:"yellow"},29:{n:"Marvin",c:"yellow"},
-  31:{n:"Pacific",c:"green"},34:{n:"Pennsylvanie",c:"green"},
-  37:{n:"Park",c:"darkblue"},39:{n:"Boulevard",c:"darkblue"},
-  5:{n:"Gare 1",c:"station"},15:{n:"Gare 2",c:"station"},
-  25:{n:"Gare 3",c:"station"},35:{n:"Gare 4",c:"station"},
-  12:{n:"Cie Électrique",c:"utility"},28:{n:"Cie des Eaux",c:"utility"},
+  1:{n:"Méditerranée",c:"brown",p:60},  3:{n:"Baltic",c:"brown",p:60},
+  6:{n:"Oriental",c:"cyan",p:100},      8:{n:"Vermont",c:"cyan",p:100},   9:{n:"Connecticut",c:"cyan",p:120},
+  11:{n:"St-Charles",c:"pink",p:140},   13:{n:"États",c:"pink",p:140},    14:{n:"Virginia",c:"pink",p:160},
+  16:{n:"St-James",c:"orange",p:180},   18:{n:"Tennessee",c:"orange",p:180}, 19:{n:"New York",c:"orange",p:200},
+  21:{n:"Kentucky",c:"red",p:220},      23:{n:"Indiana",c:"red",p:220},   24:{n:"Illinois",c:"red",p:240},
+  26:{n:"Atlantic",c:"yellow",p:260},   27:{n:"Ventnor",c:"yellow",p:260}, 29:{n:"Marvin",c:"yellow",p:280},
+  31:{n:"Pacific",c:"green",p:300},     32:{n:"Caroline N.",c:"green",p:300}, 34:{n:"Pennsylvanie",c:"green",p:320},
+  37:{n:"Park",c:"darkblue",p:350},     39:{n:"Boulevard",c:"darkblue",p:400},
+  5:{n:"Gare 1",c:"station",p:200},    15:{n:"Gare 2",c:"station",p:200},
+  25:{n:"Gare 3",c:"station",p:200},   35:{n:"Gare 4",c:"station",p:200},
+  12:{n:"Cie Électrique",c:"utility",p:150}, 28:{n:"Cie des Eaux",c:"utility",p:150},
 };
 const SPEC = {0:"DÉPART",2:"Caisse",4:"Taxes",7:"Chance",8:"Vermont",10:"Prison",
               12:"Cie Électrique",13:"États",17:"Caisse",18:"Tennessee",20:"Parc",
@@ -389,6 +396,7 @@ function render(s){
   }
   // Buttons
   const canBuy = s.pending_buy === myPid;
+  const hasTax = s.pending_tax === myPid;
   const me = s.players.find(p => p.id === myPid);
   const myPos = me?.pos;
   const propPrice = canBuy && myPos != null ? (PROPS[myPos]?.price ?? 0) : 0;
@@ -397,7 +405,7 @@ function render(s){
   const hasGoojf   = (me?.goojf ?? 0) > 0;
   const extraRoll  = s.extra_roll === myPid;
   document.getElementById('btn-start').disabled   = s.started || s.players.length < 2;
-  document.getElementById('btn-roll').disabled    = !s.started || (!isMyTurn && !extraRoll) || canBuy;
+  document.getElementById('btn-roll').disabled    = !s.started || (!isMyTurn && !extraRoll) || canBuy || hasTax;
   document.getElementById('btn-buy').disabled     = !canBuy || !canAfford;
   document.getElementById('btn-skip').disabled    = !canBuy;
   document.getElementById('btn-goojf').disabled   = !amInJail || !hasGoojf;
@@ -406,6 +414,8 @@ function render(s){
   const myOwned = Object.entries(s.owned||{}).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
   const hasMonopoly = Object.keys(GROUP_MEMBERS).some(grp=>GROUP_MEMBERS[grp].every(p=>s.owned[p]===myPid));
   document.getElementById('btn-build').disabled = !s.started || !hasMonopoly;
+  document.getElementById('btn-tax-flat').disabled = !hasTax;
+  document.getElementById('btn-tax-pct').disabled  = !hasTax;
   renderIncomingTrade(s.pending_trade, s.players);
   renderAuction(s.pending_auction, s.players);
   // Pions
@@ -421,6 +431,16 @@ function render(s){
     const el=document.createElement('div'); el.className='houses-display';
     el.textContent = n===5 ? '🏨' : '🏠'.repeat(n);
     sq.appendChild(el);
+  });
+  // Mortgaged indicator
+  document.querySelectorAll('.sq').forEach(e=>e.classList.remove('mortgaged-sq'));
+  document.querySelectorAll('.mortgage-badge').forEach(e=>e.remove());
+  Object.entries(s.mortgaged||{}).forEach(([k,v])=>{
+    if(!v) return;
+    const sq=document.querySelector(`[data-i="${k}"]`); if(!sq) return;
+    sq.classList.add('mortgaged-sq');
+    const badge=document.createElement('div'); badge.className='mortgage-badge'; badge.textContent='🏦';
+    sq.appendChild(badge);
   });
 }
 
@@ -506,12 +526,23 @@ function openInventory(){
       const swatch = SWATCH[grp]||'#888';
       html += `<div class="inv-group">`;
       html += `<h3><span class="inv-swatch" style="background:${swatch}"></span>${GROUP_LABEL[grp]||grp}${monopole?' ✅':''}</h3>`;
-      html += `<div class="inv-row header"><span>Terrain</span><span>Maisons</span><span>Prix/maison</span></div>`;
+      const groupHasHouses = GROUP_MEMBERS[grp].some(p=>(gs.houses[p]||0)>0);
+      html += `<div class="inv-row header"><span>Terrain</span><span>Maisons</span><span>Action</span></div>`;
       mine.forEach(p=>{
         const h = gs.houses[p]||0;
         const name = PROPS[p]?.n||('#'+p);
-        const hprice = HOUSE_PRICE[grp]||0;
-        html += `<div class="inv-row"><span>${name}</span><span>${houseLabel(h)}</span><span>${h<5?hprice+'$':'—'}</span></div>`;
+        const isMort = !!(gs.mortgaged && gs.mortgaged[p]);
+        const mortValue = Math.floor((PROPS[p]?.p||0)/2);
+        const unmortCost = Math.ceil((PROPS[p]?.p||0)*0.55);
+        let action;
+        if(isMort){
+          action = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer" onclick="ws?.send(JSON.stringify({cmd:'unmortgage',pos:${p}}));setTimeout(openInventory,200)">Lever (${unmortCost}$)</button>`;
+        } else if(!groupHasHouses){
+          action = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer" onclick="ws?.send(JSON.stringify({cmd:'mortgage',pos:${p}}));setTimeout(openInventory,200)">Hypothéquer (+${mortValue}$)</button>`;
+        } else {
+          action = `<span style="color:#aaa;font-size:.7rem">Vendez maisons</span>`;
+        }
+        html += `<div class="inv-row"${isMort?' style="opacity:.6;text-decoration:line-through"':''}><span>${name}${isMort?' 🏦':''}</span><span>${houseLabel(h)}</span><span>${action}</span></div>`;
       });
       html += `</div>`;
     });
@@ -519,9 +550,19 @@ function openInventory(){
     const special = myOwned.filter(p=>!allGroupProps.includes(p));
     if(special.length){
       html += `<div class="inv-group"><h3>Gares & Services publics</h3>`;
+      html += `<div class="inv-row header"><span>Terrain</span><span></span><span>Action</span></div>`;
       special.forEach(p=>{
         const name = PROPS[p]?.n||('#'+p);
-        html += `<div class="inv-row"><span>${name}</span><span>—</span><span>—</span></div>`;
+        const isMort2 = !!(gs.mortgaged && gs.mortgaged[p]);
+        const mortValue2 = Math.floor((PROPS[p]?.p||0)/2);
+        const unmortCost2 = Math.ceil((PROPS[p]?.p||0)*0.55);
+        let action2;
+        if(isMort2){
+          action2 = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer" onclick="ws?.send(JSON.stringify({cmd:'unmortgage',pos:${p}}));setTimeout(openInventory,200)">Lever (${unmortCost2}$)</button>`;
+        } else {
+          action2 = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer" onclick="ws?.send(JSON.stringify({cmd:'mortgage',pos:${p}}));setTimeout(openInventory,200)">Hypothéquer (+${mortValue2}$)</button>`;
+        }
+        html += `<div class="inv-row"${isMort2?' style="opacity:.6"':''}><span>${name}${isMort2?' 🏦':''}</span><span></span><span>${action2}</span></div>`;
       });
       html += `</div>`;
     }
