@@ -113,6 +113,7 @@ def new_room(rid):
     }
     conns[rid] = set()
 
+# Pioche la première carte du paquet et la replace en bas (cycle infini)
 def draw_card(deck):
     card = deck.pop(0)
     deck.append(card)
@@ -121,9 +122,11 @@ def draw_card(deck):
 RAILROADS = [5, 15, 25, 35]
 UTILITIES  = [12, 28]
 
+# Retourne la case cible la plus proche de pos en avançant dans le sens du jeu (modulo 40)
 def nearest(pos, targets):
     return min(targets, key=lambda t: (t - pos) % 40)
 
+# Exécute l'action d'une carte Chance ou Caisse — retourne (messages, case à acheter ou None)
 def apply_card(rid, pid, card, roll):
     room, player = rooms[rid], rooms[rid]["players"][pid]
     msgs = [f"🃏 {card['text']}"]
@@ -213,6 +216,7 @@ def apply_card(rid, pid, card, roll):
 
     return msgs, None  # None = no pending buy
 
+# Crée un joueur avec 1500$, position 0, et l'ajoute à la salle
 def add_player(rid, pid, name):
     icons = ["🔴", "🔵", "🟢", "🟡"]
     rooms[rid]["players"][pid] = {
@@ -222,6 +226,8 @@ def add_player(rid, pid, name):
     }
     rooms[rid]["order"].append(pid)
 
+# Lance les dés, déplace le joueur et résout les conséquences (loyer, cartes, prison, achat)
+# Retourne (messages, case à acheter ou None, peut relancer après un double)
 def do_move(rid, pid):
     room, player = rooms[rid], rooms[rid]["players"][pid]
     d1, d2 = random.randint(1, 6), random.randint(1, 6)
@@ -330,6 +336,7 @@ def do_move(rid, pid):
 
     return msgs, pending_buy_pos, can_roll_again
 
+# Élimine un joueur : retourne ses maisons et propriétés à la banque, le retire de l'ordre, vérifie la victoire
 def do_bankruptcy(rid, pid):
     room = rooms[rid]
     player = room["players"][pid]
@@ -360,6 +367,7 @@ def do_bankruptcy(rid, pid):
         msgs.append(f"🏆 {active[0]['name']} remporte la partie!")
     return msgs
 
+# Achète la propriété sur laquelle se trouve le joueur courant
 def do_buy(rid, pid):
     room, player = rooms[rid], rooms[rid]["players"][pid]
     pos = player["pos"]
@@ -371,6 +379,7 @@ def do_buy(rid, pid):
     room["owned"][pos] = pid
     return f"✅ {player['name']} achète {p['name']} pour {p['price']}$"
 
+# Sérialise l'état d'enchère en excluant la tâche asyncio (non JSON-sérialisable)
 def get_auction_state(room):
     a = room.get("pending_auction")
     if not a:
@@ -384,6 +393,7 @@ def get_auction_state(room):
         "submitted": list(a["bids"].keys()),
     }
 
+# Construit l'état complet de la partie à diffuser à tous les joueurs
 def get_state(rid):
     room = rooms[rid]
     cur = room["order"][room["turn"] % len(room["order"])] if room["order"] else None
@@ -403,6 +413,7 @@ def get_state(rid):
             "winner": room.get("winner"),
             "extra_roll": room.get("extra_roll")}
 
+# Conclut l'enchère : révèle toutes les mises, transfère la propriété au plus offrant et avance le tour
 async def end_auction(rid):
     room = rooms.get(rid)
     if not room or not room.get("pending_auction"):
@@ -434,6 +445,7 @@ async def end_auction(rid):
     room["turn"] += 1
     await broadcast(rid, get_state(rid))
 
+# Envoie un message JSON à tous les WebSockets actifs de la salle, retire les connexions mortes
 async def broadcast(rid, data):
     dead = set()
     for ws in conns[rid]:

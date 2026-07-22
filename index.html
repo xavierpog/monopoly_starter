@@ -347,6 +347,7 @@ for(let i=11;i<=20;i++) POS[i]=[11, i-10+1];       // colonne droite, haut→bas
 for(let i=21;i<=30;i++) POS[i]=[11-(i-20), 11];    // rangée du bas, droite→gauche
 for(let i=31;i<=39;i++) POS[i]=[1, 11-(i-30)];     // colonne gauche, bas→haut
 
+// Génère la grille 11x11 du plateau avec les cases, barres de couleur et libellés
 function buildBoard() {
   const b = document.getElementById('board');
   b.innerHTML = '';
@@ -376,6 +377,7 @@ function buildBoard() {
   }
 }
 
+// Applique l'état reçu du serveur à l'interface : joueurs, boutons, pions, propriétés, maisons, hypothèques
 function render(s){
   gs = s;
   const isMyTurn = s.turn === myPid;
@@ -444,13 +446,16 @@ function render(s){
   });
 }
 
+// Ajoute un message au journal de jeu et fait défiler vers le bas automatiquement
 function log(msg){
   const l=document.getElementById('log');
   l.innerHTML+=`<div>${msg}</div>`;
   l.scrollTop=l.scrollHeight;
 }
 
+// Envoie une commande simple sans paramètres via WebSocket
 function send(cmd){ ws?.send(JSON.stringify({cmd})); }
+// Lit le champ de saisie et envoie le message de chat au serveur
 function chat(){ const i=document.getElementById('chat-in'); if(!i.value.trim()) return; ws?.send(JSON.stringify({cmd:'chat',text:i.value})); i.value=''; }
 
 const PROP_NAMES = {};
@@ -474,8 +479,10 @@ for(const [pos,grp] of Object.entries(COLOR_GROUPS)){
 const HOUSE_PRICE = {brown:50,cyan:50,pink:100,orange:100,red:150,yellow:150,green:200,dblue:200};
 const GROUP_LABEL = {brown:"Marron",cyan:"Bleu clair",pink:"Rose",orange:"Orange",red:"Rouge",yellow:"Jaune",green:"Vert",dblue:"Bleu foncé"};
 
+// Retourne l'icône représentant les maisons ou l'hôtel pour une case donnée
 function houseLabel(n){ return n===5?"🏨 Hôtel":"🏠".repeat(n)||"—"; }
 
+// Ouvre le modal de construction et liste les monopoles possédés avec leurs maisons actuelles
 function openBuild(){
   if(!gs) return;
   const myOwned = Object.entries(gs.owned).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
@@ -506,9 +513,12 @@ function openBuild(){
   document.getElementById('build-overlay').classList.add('open');
 }
 
+// Recharge le contenu du modal de construction depuis l'état courant
 function refreshBuild(){ if(gs) openBuild(); }
+// Ferme le modal de construction
 function closeBuild(){ document.getElementById('build-overlay').classList.remove('open'); }
 
+// Ouvre le modal d'inventaire : propriétés groupées par couleur avec statut hypothèque et boutons d'action
 function openInventory(){
   if(!gs) return;
   const myOwned = Object.entries(gs.owned).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
@@ -573,6 +583,7 @@ function openInventory(){
 
 let auctionInterval = null;
 
+// Affiche le panneau d'enchère avec le timer, les mises en attente et le formulaire de mise
 function renderAuction(a, players) {
   const panel = document.getElementById('auction-panel');
   if (!a) {
@@ -617,6 +628,7 @@ function renderAuction(a, players) {
   }
 }
 
+// Soumet la mise d'enchère au serveur (passer forced=0 pour sauter sans miser)
 function submitBid(forced) {
   const amount = forced === 0 ? 0 : Math.max(0, parseInt(document.getElementById('auction-amount').value) || 0);
   ws?.send(JSON.stringify({ cmd: 'bid', amount }));
@@ -624,6 +636,7 @@ function submitBid(forced) {
   document.getElementById('auction-submitted').textContent = amount === 0 ? '✅ Vous avez passé.' : `✅ Mise de ${amount}$ soumise.`;
 }
 
+// Ouvre le modal d'échange et peuple la liste des joueurs, des propriétés offertes et demandées
 function openTrade(){
   if(!gs) return;
   // Populate target players
@@ -644,6 +657,7 @@ function openTrade(){
   document.getElementById('trade-overlay').classList.add('open');
 }
 
+// Met à jour la colonne "Je demande" selon le joueur cible sélectionné dans le modal d'échange
 function renderReqProps(){
   const targetId = document.getElementById('trade-target').value;
   if(!targetId || !gs) return;
@@ -653,8 +667,10 @@ function renderReqProps(){
     : '<em style="color:#aaa;font-size:.8rem">Aucune propriété</em>';
 }
 
+// Ferme le modal d'échange
 function closeTrade(){ document.getElementById('trade-overlay').classList.remove('open'); }
 
+// Collecte les données du formulaire d'échange et envoie l'offre au serveur
 function submitTrade(){
   const to = document.getElementById('trade-target').value;
   const offerMoney = parseInt(document.getElementById('trade-offer-money').value)||0;
@@ -667,6 +683,7 @@ function submitTrade(){
   closeTrade();
 }
 
+// Affiche la bannière d'échange entrant si le joueur courant est le destinataire de l'offre
 function renderIncomingTrade(trade, players){
   const el = document.getElementById('trade-incoming');
   if(!trade || trade.to !== myPid){ el.classList.remove('open'); return; }
@@ -683,6 +700,7 @@ function renderIncomingTrade(trade, players){
   el.classList.add('open');
 }
 
+// Connecte le joueur au serveur WebSocket et s'abonne aux événements de la partie
 function join(){
   const name=document.getElementById('inp-name').value.trim();
   const room=document.getElementById('inp-room').value.trim();
