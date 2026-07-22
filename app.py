@@ -108,7 +108,7 @@ def new_room(rid):
         "players": {}, "order": [], "turn": 0, "started": False, "owned": {},
         "pending_buy": None, "pending_trade": None,
         "chance_deck": chance, "community_deck": community,
-        "goojf": {}, "houses": {},  # pos -> 1-4 (maisons) ou 5 (hôtel)
+        "goojf": {}, "houses": {}, "game_over": False, "winner": None,
     }
     conns[rid] = set()
 
@@ -133,7 +133,7 @@ def apply_card(rid, pid, card, roll):
     elif action == "lose":
         player["money"] -= card["amount"]
         if player["money"] <= 0:
-            player["bankrupt"] = True; msgs.append(f"💀 {player['name']} en faillite!")
+            msgs += do_bankruptcy(rid, pid)
     elif action == "goto":
         dest = card["dest"]
         if dest <= player["pos"] and dest != player["pos"]:
@@ -156,7 +156,7 @@ def apply_card(rid, pid, card, roll):
         player["money"] -= total
         for o in others: o["money"] += amt
         if player["money"] <= 0:
-            player["bankrupt"] = True; msgs.append(f"💀 {player['name']} en faillite!")
+            msgs += do_bankruptcy(rid, pid)
     elif action == "collect_all":
         amt = card["amount"]
         others = [p for p in room["players"].values() if p["id"] != pid and not p["bankrupt"]]
@@ -176,7 +176,7 @@ def apply_card(rid, pid, card, roll):
             player["money"] -= rent; room["players"][owner]["money"] += rent
             msgs.append(f"💸 Double loyer {rent}$ → {room['players'][owner]['name']}")
             if player["money"] <= 0:
-                player["bankrupt"] = True; msgs.append(f"💀 {player['name']} en faillite!")
+                msgs += do_bankruptcy(rid, pid)
         elif owner is None:
             msgs.append(f"🏠 {PROPERTIES[dest]['name']} à vendre — cliquez Acheter")
             return msgs, dest
@@ -191,7 +191,7 @@ def apply_card(rid, pid, card, roll):
             player["money"] -= rent; room["players"][owner]["money"] += rent
             msgs.append(f"💸 {rent}$ (10× dés) → {room['players'][owner]['name']}")
             if player["money"] <= 0:
-                player["bankrupt"] = True; msgs.append(f"💀 {player['name']} en faillite!")
+                msgs += do_bankruptcy(rid, pid)
         elif owner is None:
             msgs.append(f"🏠 {PROPERTIES[dest]['name']} à vendre — cliquez Acheter")
             return msgs, dest
@@ -288,16 +288,45 @@ def do_move(rid, pid):
             o["money"] += rent
             msgs.append(f"💸 Loyer {rent}$ → {o['name']}")
             if player["money"] <= 0:
-                player["bankrupt"] = True
-                msgs.append(f"💀 {player['name']} en faillite!")
+                msgs += do_bankruptcy(rid, pid)
         else:
             msgs.append(f"🏠 Votre propriété : {p['name']}")
     elif new_pos in SPECIAL:
         msgs.append(f"⭐ {SPECIAL[new_pos]}")
-        if new_pos == 4:  player["money"] -= 200
-        elif new_pos == 38: player["money"] -= 100
+        if new_pos == 4:
+            player["money"] -= 200
+            if player["money"] <= 0: msgs += do_bankruptcy(rid, pid)
+        elif new_pos == 38:
+            player["money"] -= 100
+            if player["money"] <= 0: msgs += do_bankruptcy(rid, pid)
 
     return msgs, pending_buy_pos
+
+def do_bankruptcy(rid, pid):
+    room = rooms[rid]
+    player = room["players"][pid]
+    player["bankrupt"] = True
+    player["money"] = 0
+    # Retirer les maisons du joueur
+    for pos in list(room.get("houses", {}).keys()):
+        if room["owned"].get(pos) == pid:
+            del room["houses"][pos]
+    # Retourner les propriétés à la banque
+    for pos in list(room["owned"].keys()):
+        if room["owned"][pos] == pid:
+            del room["owned"][pos]
+    # Retirer de l'ordre de jeu
+    if pid in room["order"]:
+        room["order"].remove(pid)
+    if room["order"] and room["turn"] >= len(room["order"]):
+        room["turn"] %= len(room["order"])
+    msgs = [f"💀 {player['name']} est en faillite! Ses propriétés retournent à la banque."]
+    active = [p for p in room["players"].values() if not p["bankrupt"]]
+    if len(active) == 1:
+        room["game_over"] = True
+        room["winner"] = active[0]["id"]
+        msgs.append(f"🏆 {active[0]['name']} remporte la partie!")
+    return msgs
 
 def do_buy(rid, pid):
     room, player = rooms[rid], rooms[rid]["players"][pid]
@@ -331,7 +360,9 @@ def get_state(rid):
             "started": room["started"], "pending_buy": room.get("pending_buy"),
             "pending_trade": room.get("pending_trade"),
             "houses": {str(k): v for k, v in room.get("houses", {}).items()},
-            "pending_auction": get_auction_state(room)}
+            "pending_auction": get_auction_state(room),
+        "game_over": room.get("game_over", False),
+        "winner": room.get("winner")}
 
 async def end_auction(rid):
     room = rooms.get(rid)

@@ -66,7 +66,22 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 #players-box h3, #controls h3, #log-box h3 { font-size: 0.95rem; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
 .pcard { font-size: 0.85rem; padding: 4px 0; border-bottom: 1px solid #f0f0f0; }
 .pcard.active-turn { font-weight: bold; }
+.pcard.bankrupt { opacity: 0.4; text-decoration: line-through; }
 .pcard .pmoney { color: #2a7a2a; }
+
+#win-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7); z-index: 200;
+  align-items: center; justify-content: center;
+}
+#win-overlay.open { display: flex; }
+#win-box {
+  background: #fff; border-radius: 8px; padding: 40px;
+  text-align: center; box-shadow: 0 4px 30px rgba(0,0,0,0.4);
+}
+#win-box h1 { font-size: 2rem; margin-bottom: 10px; }
+#win-box p  { font-size: 1.1rem; color: #555; margin-bottom: 20px; }
+#win-box button { padding: 10px 24px; background: #222; color: #fff; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; }
 
 #controls { display: flex; flex-direction: column; gap: 6px; }
 #controls button {
@@ -221,6 +236,14 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
   </div>
 </div>
 
+<div id="win-overlay">
+  <div id="win-box">
+    <h1>🏆 Partie terminée!</h1>
+    <p id="win-msg"></p>
+    <button onclick="document.getElementById('win-overlay').classList.remove('open')">Fermer</button>
+  </div>
+</div>
+
 <div id="build-overlay">
   <div id="build-modal">
     <h2>🏗️ Construire / Vendre des maisons</h2>
@@ -320,12 +343,18 @@ function render(s){
   // Players
   const pc = document.getElementById('players');
   pc.innerHTML = s.players.map(p =>
-    `<div class="pcard${p.id===s.turn?' active-turn':''}">
+    `<div class="pcard${p.id===s.turn?' active-turn':''}${p.bankrupt?' bankrupt':''}">
       ${p.icon} ${p.name}${p.id===myPid?' (vous)':''}
       <span class="pmoney"> — ${p.money}$</span>
-      <span style="color:#888;font-size:.75rem"> case ${p.pos}${p.in_jail?' 🚔 prison ('+p.jail_turns+'/3)':''}${p.bankrupt?' 💀':''}</span>
+      <span style="color:#888;font-size:.75rem"> case ${p.pos}${p.in_jail?' 🚔 prison ('+p.jail_turns+'/3)':''}${p.bankrupt?' 💀 en faillite':''}</span>
     </div>`
   ).join('');
+  // Écran de victoire
+  if (s.game_over && s.winner) {
+    const winner = s.players.find(p => p.id === s.winner);
+    document.getElementById('win-msg').textContent = `${winner?.icon} ${winner?.name} remporte la partie!`;
+    document.getElementById('win-overlay').classList.add('open');
+  }
   // Buttons
   const canBuy = s.pending_buy === myPid;
   const me = s.players.find(p => p.id === myPid);
