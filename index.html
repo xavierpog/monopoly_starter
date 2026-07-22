@@ -186,6 +186,7 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
       <button id="btn-buy"   onclick="send('buy')"   disabled>Acheter la propriété</button>
       <button id="btn-skip"  onclick="send('auction')" disabled>🔨 Enchère</button>
       <button id="btn-trade" onclick="openTrade()" disabled>🤝 Proposer un échange</button>
+      <button id="btn-payjail" onclick="send('pay_jail')" disabled>💰 Payer 50$ (sortir de prison)</button>
       <button id="btn-build" onclick="openBuild()" disabled>🏗️ Construire / Vendre</button>
     </div>
     <div id="auction-panel">
@@ -322,7 +323,7 @@ function render(s){
     `<div class="pcard${p.id===s.turn?' active-turn':''}">
       ${p.icon} ${p.name}${p.id===myPid?' (vous)':''}
       <span class="pmoney"> — ${p.money}$</span>
-      <span style="color:#888;font-size:.75rem"> case ${p.pos}${p.bankrupt?' 💀':''}</span>
+      <span style="color:#888;font-size:.75rem"> case ${p.pos}${p.in_jail?' 🚔 prison ('+p.jail_turns+'/3)':''}${p.bankrupt?' 💀':''}</span>
     </div>`
   ).join('');
   // Buttons
@@ -331,10 +332,12 @@ function render(s){
   const myPos = me?.pos;
   const propPrice = canBuy && myPos != null ? (PROPS[myPos]?.price ?? 0) : 0;
   const canAfford = me && me.money >= propPrice;
-  document.getElementById('btn-start').disabled = s.started || s.players.length < 2;
-  document.getElementById('btn-roll').disabled  = !s.started || !isMyTurn || canBuy;
-  document.getElementById('btn-buy').disabled   = !canBuy || !canAfford;
-  document.getElementById('btn-skip').disabled  = !canBuy;
+  const amInJail = me?.in_jail && isMyTurn;
+  document.getElementById('btn-start').disabled   = s.started || s.players.length < 2;
+  document.getElementById('btn-roll').disabled    = !s.started || !isMyTurn || canBuy;
+  document.getElementById('btn-buy').disabled     = !canBuy || !canAfford;
+  document.getElementById('btn-skip').disabled    = !canBuy;
+  document.getElementById('btn-payjail').disabled = !amInJail || (me?.money < 50);
   document.getElementById('btn-trade').disabled = !s.started || s.players.filter(p=>p.id!==myPid&&!p.bankrupt).length===0;
   const myOwned = Object.entries(s.owned||{}).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
   const hasMonopoly = Object.keys(GROUP_MEMBERS).some(grp=>GROUP_MEMBERS[grp].every(p=>s.owned[p]===myPid));

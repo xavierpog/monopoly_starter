@@ -202,7 +202,8 @@ def add_player(rid, pid, name):
     icons = ["🔴", "🔵", "🟢", "🟡"]
     rooms[rid]["players"][pid] = {
         "id": pid, "name": name, "money": 1500, "pos": 0,
-        "icon": icons[len(rooms[rid]["players"]) % 4], "bankrupt": False
+        "icon": icons[len(rooms[rid]["players"]) % 4], "bankrupt": False,
+        "in_jail": False, "jail_turns": 0, "doubles_streak": 0,
     }
     rooms[rid]["order"].append(pid)
 
@@ -210,13 +211,46 @@ def do_move(rid, pid):
     room, player = rooms[rid], rooms[rid]["players"][pid]
     d1, d2 = random.randint(1, 6), random.randint(1, 6)
     roll = d1 + d2
+    doubles = (d1 == d2)
+    msgs = [f"🎲 {player['name']} fait {d1}+{d2}{'  🎯 Double!' if doubles else ''}"]
+    pending_buy_pos = None
+
+    # --- Cas : joueur en prison ---
+    if player["in_jail"]:
+        if doubles:
+            player["in_jail"] = False
+            player["jail_turns"] = 0
+            player["doubles_streak"] = 0
+            msgs.append("🔓 Double! Vous sortez de prison!")
+        else:
+            player["jail_turns"] += 1
+            if player["jail_turns"] >= 3:
+                player["money"] -= 50
+                player["in_jail"] = False
+                player["jail_turns"] = 0
+                msgs.append("🚔 3 tours en prison — 50$ payés automatiquement, vous sortez.")
+            else:
+                msgs.append(f"🚔 Pas de double — vous restez en prison ({player['jail_turns']}/3 tours).")
+                return msgs, None  # tour terminé, pas de déplacement
+    else:
+        # --- Vérifier 3 doubles consécutifs ---
+        if doubles:
+            player["doubles_streak"] += 1
+            if player["doubles_streak"] >= 3:
+                player["pos"] = 10
+                player["in_jail"] = True
+                player["doubles_streak"] = 0
+                msgs.append("🚔 3 doubles de suite — En prison!")
+                return msgs, None
+        else:
+            player["doubles_streak"] = 0
+
     new_pos = (player["pos"] + roll) % 40
-    msgs = [f"🎲 {player['name']} fait {d1}+{d2} → case {new_pos}"]
+    msgs[0] += f" → case {new_pos}"
     if new_pos < player["pos"]:
         player["money"] += 200
         msgs.append("✅ Passage DÉPART +200$")
     player["pos"] = new_pos
-    pending_buy_pos = None
 
     if new_pos == 30:
         player["pos"] = 10
@@ -380,6 +414,23 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 await broadcast(rid, {"event": "chat", "msg": do_buy(rid, pid)})
                 room["pending_buy"] = None
                 room["turn"] += 1
+                await broadcast(rid, get_state(rid))
+            elif cmd == "pay_jail":
+                cur = room["order"][room["turn"] % len(room["order"])]
+                if pid != cur:
+                    await ws.send_json({"event":"chat","msg":"⚠️ Pas votre tour."})
+                    continue
+                player = room["players"][pid]
+                if not player["in_jail"]:
+                    await ws.send_json({"event":"chat","msg":"❌ Vous n'êtes pas en prison."})
+                    continue
+                if player["money"] < 50:
+                    await ws.send_json({"event":"chat","msg":"❌ Pas assez d'argent (50$ requis)."})
+                    continue
+                player["money"] -= 50
+                player["in_jail"] = False
+                player["jail_turns"] = 0
+                await broadcast(rid, {"event":"chat","msg":f"🔓 {player['name']} paie 50$ et sort de prison!"})
                 await broadcast(rid, get_state(rid))
             elif cmd == "auction":
                 if room.get("pending_buy") != pid:
