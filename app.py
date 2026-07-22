@@ -544,7 +544,8 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 player["money"] -= 50
                 player["in_jail"] = False
                 player["jail_turns"] = 0
-                await broadcast(rid, {"event":"chat","msg":f"🔓 {player['name']} paie 50$ et sort de prison!"})
+                room["turn"] += 1
+                await broadcast(rid, {"event":"chat","msg":f"🔓 {player['name']} paie 50$ et sort de prison — tour terminé, lancez les dés au prochain tour!"})
                 await broadcast(rid, get_state(rid))
             elif cmd == "auction":
                 if room.get("pending_buy") != pid:
