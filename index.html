@@ -24,22 +24,22 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 /* Board */
 #board {
   display: grid;
-  grid-template-columns: repeat(11, 58px);
-  grid-template-rows: repeat(11, 58px);
+  grid-template-columns: repeat(11, 76px);
+  grid-template-rows: repeat(11, 76px);
   gap: 1px; background: #999;
 }
 .sq {
   background: #fff; display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  font-size: 0.48rem; text-align: center; padding: 2px;
+  font-size: 0.62rem; text-align: center; padding: 3px;
   position: relative; overflow: hidden;
 }
-.sq.corner { font-size: 0.6rem; background: #e8e8e8; font-weight: bold; }
-.color-bar { width: 100%; height: 7px; position: absolute; top: 0; }
-.sq-label { margin-top: 9px; line-height: 1.2; }
-.sq-price { color: #666; font-size: 0.45rem; }
+.sq.corner { font-size: 0.72rem; background: #e8e8e8; font-weight: bold; }
+.color-bar { width: 100%; height: 10px; position: absolute; top: 0; }
+.sq-label { margin-top: 12px; line-height: 1.3; }
+.sq-price { color: #666; font-size: 0.56rem; }
 .sq.owned { outline: 2px solid #333; }
-.pions { position: absolute; bottom: 1px; right: 2px; font-size: 0.75rem; }
+.pions { position: absolute; bottom: 2px; right: 3px; font-size: 0.9rem; }
 .center-cell {
   grid-column: 2/11; grid-row: 2/11;
   background: #fff; display: flex; align-items: center;
@@ -110,6 +110,28 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 #auction-bid-row button { padding: 4px 10px; border-radius: 3px; border: 1px solid #aaa; cursor: pointer; font-size: 0.82rem; background: #f5f5f5; }
 #auction-bid-row button.submit { background: #1565c0; color: #fff; border-color: #1565c0; }
 #auction-submitted { color: #2a7a2a; margin-top: 6px; font-weight: bold; }
+
+/* Tax modal */
+#tax-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6); z-index: 150;
+  align-items: center; justify-content: center;
+}
+#tax-overlay.open { display: flex; }
+#tax-modal {
+  background: #fff; border-radius: 8px; padding: 28px 32px;
+  width: 400px; max-width: 95vw;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3); text-align: center;
+}
+#tax-modal h2 { font-size: 1.3rem; margin-bottom: 8px; }
+#tax-modal .tax-info { font-size: 0.88rem; color: #555; margin-bottom: 18px; }
+.tax-options { display: flex; gap: 12px; justify-content: center; }
+.tax-options button {
+  flex: 1; padding: 12px 8px; border-radius: 4px; border: 1px solid #aaa;
+  cursor: pointer; font-size: 0.9rem; background: #f5f5f5; font-weight: bold;
+}
+.tax-options button:hover { background: #e0e0e0; }
+.tax-options button.primary { background: #2a7a2a; color: #fff; border-color: #2a7a2a; }
 
 /* Mortgaged squares */
 .sq.mortgaged-sq { opacity: 0.65; }
@@ -230,8 +252,6 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
       <button id="btn-payjail" onclick="send('pay_jail')" disabled>💰 Payer 50$ (sortir de prison)</button>
       <button id="btn-build"     onclick="openBuild()"     disabled>🏗️ Construire / Vendre</button>
       <button id="btn-inventory" onclick="openInventory()">📋 Mes propriétés / Hypothèques</button>
-      <button id="btn-tax-flat" onclick="send('tax_flat')" disabled>💸 Payer 200$ (taxe fixe)</button>
-      <button id="btn-tax-pct"  onclick="send('tax_pct')"  disabled>📊 Payer 10% de mes avoirs</button>
     </div>
     <div id="auction-panel">
       <h4>🔨 Enchère en cours : <span id="auction-prop"></span></h4>
@@ -270,6 +290,17 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
     <h1>🏆 Partie terminée!</h1>
     <p id="win-msg"></p>
     <button onclick="document.getElementById('win-overlay').classList.remove('open')">Fermer</button>
+  </div>
+</div>
+
+<div id="tax-overlay">
+  <div id="tax-modal">
+    <h2>💸 Taxe sur le revenu</h2>
+    <div class="tax-info" id="tax-info"></div>
+    <div class="tax-options">
+      <button onclick="send('tax_flat')">Payer 200$ fixe</button>
+      <button class="primary" onclick="send('tax_pct')">Payer <span id="tax-pct-amount"></span> (10%)</button>
+    </div>
   </div>
 </div>
 
@@ -416,8 +447,26 @@ function render(s){
   const myOwned = Object.entries(s.owned||{}).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
   const hasMonopoly = Object.keys(GROUP_MEMBERS).some(grp=>GROUP_MEMBERS[grp].every(p=>s.owned[p]===myPid));
   document.getElementById('btn-build').disabled = !s.started || !hasMonopoly;
-  document.getElementById('btn-tax-flat').disabled = !hasTax;
-  document.getElementById('btn-tax-pct').disabled  = !hasTax;
+  // Popup taxe sur le revenu : calcule les avoirs et affiche le modal si c'est notre tour
+  if(hasTax && me) {
+    let wealth = me.money;
+    Object.entries(s.owned||{}).forEach(([k, owner]) => {
+      if(owner === myPid) {
+        const price = PROPS[parseInt(k)]?.p || 0;
+        wealth += (s.mortgaged && s.mortgaged[k]) ? Math.floor(price/2) : price;
+      }
+    });
+    Object.entries(s.houses||{}).forEach(([k, n]) => {
+      const grp = COLOR_GROUPS[parseInt(k)];
+      if(grp && (s.owned||{})[k] === myPid) wealth += n * (HOUSE_PRICE[grp]||0);
+    });
+    const pct = Math.max(1, Math.floor(wealth / 10));
+    document.getElementById('tax-info').textContent = `Avoirs estimés : ${wealth}$ — choisissez votre mode de paiement`;
+    document.getElementById('tax-pct-amount').textContent = pct + '$';
+    document.getElementById('tax-overlay').classList.add('open');
+  } else {
+    document.getElementById('tax-overlay').classList.remove('open');
+  }
   renderIncomingTrade(s.pending_trade, s.players);
   renderAuction(s.pending_auction, s.players);
   // Pions
