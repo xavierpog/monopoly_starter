@@ -111,6 +111,26 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 #auction-bid-row button.submit { background: #1565c0; color: #fff; border-color: #1565c0; }
 #auction-submitted { color: #2a7a2a; margin-top: 6px; font-weight: bold; }
 
+/* Inventory modal */
+#inventory-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 100;
+  align-items: center; justify-content: center;
+}
+#inventory-overlay.open { display: flex; }
+#inventory-modal {
+  background: #fff; border-radius: 6px; padding: 20px;
+  width: 480px; max-width: 95vw; max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+#inventory-modal h2 { font-size: 1.1rem; margin-bottom: 14px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+.inv-group { margin-bottom: 14px; }
+.inv-group h3 { font-size: 0.82rem; font-weight: bold; margin-bottom: 5px; text-transform: capitalize; display: flex; align-items: center; gap: 6px; }
+.inv-group h3 .inv-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
+.inv-row { display: grid; grid-template-columns: 1fr 80px 80px; font-size: 0.78rem; padding: 3px 0; border-bottom: 1px solid #f5f5f5; gap: 4px; align-items: center; }
+.inv-row.header { font-weight: bold; color: #555; font-size: 0.73rem; }
+#inventory-modal .close-btn { margin-top: 14px; padding: 7px 16px; border-radius: 3px; border: 1px solid #aaa; cursor: pointer; font-size: 0.88rem; background: #f5f5f5; }
+
 /* Build modal */
 #build-overlay {
   display: none; position: fixed; inset: 0;
@@ -203,7 +223,8 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
       <button id="btn-trade" onclick="openTrade()" disabled>🤝 Proposer un échange</button>
       <button id="btn-goojf"   onclick="send('use_goojf')" disabled>🎫 Carte Sortie de Prison</button>
       <button id="btn-payjail" onclick="send('pay_jail')" disabled>💰 Payer 50$ (sortir de prison)</button>
-      <button id="btn-build" onclick="openBuild()" disabled>🏗️ Construire / Vendre</button>
+      <button id="btn-build"     onclick="openBuild()"     disabled>🏗️ Construire / Vendre</button>
+      <button id="btn-inventory" onclick="openInventory()">📋 Mes propriétés</button>
     </div>
     <div id="auction-panel">
       <h4>🔨 Enchère en cours : <span id="auction-prop"></span></h4>
@@ -245,6 +266,14 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
   </div>
 </div>
 
+<div id="inventory-overlay">
+  <div id="inventory-modal">
+    <h2>📋 Mes propriétés</h2>
+    <div id="inventory-content"></div>
+    <button class="close-btn" onclick="document.getElementById('inventory-overlay').classList.remove('open')">Fermer</button>
+  </div>
+</div>
+
 <div id="build-overlay">
   <div id="build-modal">
     <h2>🏗️ Construire / Vendre des maisons</h2>
@@ -265,6 +294,7 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
         <input type="number" id="trade-offer-money" min="0" value="0"/>
         <label>Propriétés</label>
         <div class="trade-props" id="trade-offer-props"></div>
+        <label><input type="checkbox" id="trade-offer-goojf"> 🎫 Carte Sortie de Prison</label>
       </div>
       <div class="trade-col">
         <h3>Je demande</h3>
@@ -272,6 +302,7 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
         <input type="number" id="trade-req-money" min="0" value="0"/>
         <label>Propriétés</label>
         <div class="trade-props" id="trade-req-props"></div>
+        <label><input type="checkbox" id="trade-req-goojf"> 🎫 Carte Sortie de Prison</label>
       </div>
     </div>
     <div class="trade-actions">
@@ -458,6 +489,47 @@ function openBuild(){
 function refreshBuild(){ if(gs) openBuild(); }
 function closeBuild(){ document.getElementById('build-overlay').classList.remove('open'); }
 
+function openInventory(){
+  if(!gs) return;
+  const myOwned = Object.entries(gs.owned).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
+  const goojfCount = gs.players.find(p=>p.id===myPid)?.goojf||0;
+  const SWATCH = {brown:'#955436',cyan:'#00aeef',pink:'#d93a96',orange:'#f7941d',red:'#ed1b24',yellow:'#fef200',green:'#1fb25a',dblue:'#0050a0'};
+  let html = '';
+  if(goojfCount > 0) html += `<p style="margin-bottom:10px">🎫 Cartes Sortie de Prison : <strong>${goojfCount}</strong></p>`;
+  if(myOwned.length === 0 && goojfCount === 0){
+    html = '<em style="color:#aaa">Vous ne possédez aucune propriété.</em>';
+  } else {
+    Object.entries(GROUP_MEMBERS).forEach(([grp, members])=>{
+      const mine = members.filter(p=>myOwned.includes(p));
+      if(!mine.length) return;
+      const monopole = members.every(p=>myOwned.includes(p));
+      const swatch = SWATCH[grp]||'#888';
+      html += `<div class="inv-group">`;
+      html += `<h3><span class="inv-swatch" style="background:${swatch}"></span>${GROUP_LABEL[grp]||grp}${monopole?' ✅':''}</h3>`;
+      html += `<div class="inv-row header"><span>Terrain</span><span>Maisons</span><span>Prix/maison</span></div>`;
+      mine.forEach(p=>{
+        const h = gs.houses[p]||0;
+        const name = PROPS[p]?.n||('#'+p);
+        const hprice = HOUSE_PRICE[grp]||0;
+        html += `<div class="inv-row"><span>${name}</span><span>${houseLabel(h)}</span><span>${h<5?hprice+'$':'—'}</span></div>`;
+      });
+      html += `</div>`;
+    });
+    const allGroupProps = Object.values(GROUP_MEMBERS).flat();
+    const special = myOwned.filter(p=>!allGroupProps.includes(p));
+    if(special.length){
+      html += `<div class="inv-group"><h3>Gares & Services publics</h3>`;
+      special.forEach(p=>{
+        const name = PROPS[p]?.n||('#'+p);
+        html += `<div class="inv-row"><span>${name}</span><span>—</span><span>—</span></div>`;
+      });
+      html += `</div>`;
+    }
+  }
+  document.getElementById('inventory-content').innerHTML = html;
+  document.getElementById('inventory-overlay').classList.add('open');
+}
+
 let auctionInterval = null;
 
 function renderAuction(a, players) {
@@ -548,7 +620,9 @@ function submitTrade(){
   const reqMoney   = parseInt(document.getElementById('trade-req-money').value)||0;
   const offerProps = [...document.querySelectorAll('#trade-offer-props input:checked')].map(i=>parseInt(i.value));
   const reqProps   = [...document.querySelectorAll('#trade-req-props input:checked')].map(i=>parseInt(i.value));
-  ws?.send(JSON.stringify({cmd:'trade_offer', to, offer_money:offerMoney, offer_props:offerProps, req_money:reqMoney, req_props:reqProps}));
+  const offerGoojf = document.getElementById('trade-offer-goojf').checked ? 1 : 0;
+  const reqGoojf   = document.getElementById('trade-req-goojf').checked ? 1 : 0;
+  ws?.send(JSON.stringify({cmd:'trade_offer', to, offer_money:offerMoney, offer_props:offerProps, offer_goojf:offerGoojf, req_money:reqMoney, req_props:reqProps, req_goojf:reqGoojf}));
   closeTrade();
 }
 
@@ -560,8 +634,10 @@ function renderIncomingTrade(trade, players){
   let html = `<strong>${from?.icon} ${from?.name}</strong> vous propose :<br>`;
   if(trade.offer_money) html += `💵 Offre ${trade.offer_money}$<br>`;
   if(trade.offer_props.length) html += `🏠 Offre : ${trade.offer_props.map(propName).join(', ')}<br>`;
+  if(trade.offer_goojf) html += `🎫 Offre une Carte Sortie de Prison<br>`;
   if(trade.req_money) html += `💵 Demande ${trade.req_money}$<br>`;
   if(trade.req_props.length) html += `🏠 Demande : ${trade.req_props.map(propName).join(', ')}<br>`;
+  if(trade.req_goojf) html += `🎫 Demande une Carte Sortie de Prison<br>`;
   document.getElementById('ti-details').innerHTML = html;
   el.classList.add('open');
 }

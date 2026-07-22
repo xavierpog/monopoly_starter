@@ -163,8 +163,15 @@ def apply_card(rid, pid, card, roll):
         for o in others:
             o["money"] -= amt; player["money"] += amt
     elif action == "repairs":
-        # No houses/hotels yet → no charge
-        pass
+        total = 0
+        for pos, count in room.get("houses", {}).items():
+            if room["owned"].get(pos) == pid:
+                total += card["hotel"] if count == 5 else count * card["house"]
+        if total > 0:
+            player["money"] -= total
+            msgs.append(f"🔨 Réparations : {total}$ payés.")
+            if player["money"] <= 0:
+                msgs += do_bankruptcy(rid, pid)
     elif action == "nearest_railroad":
         dest = nearest(player["pos"], RAILROADS)
         if dest <= player["pos"]:
@@ -605,12 +612,16 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 if to not in room["players"] or to == pid:
                     await ws.send_json({"event": "chat", "msg": "❌ Joueur invalide."})
                     continue
+                offer_goojf = min(int(msg.get("offer_goojf", 0)), room["goojf"].get(pid, 0))
+                req_goojf   = min(int(msg.get("req_goojf",   0)), room["goojf"].get(to,  0))
                 room["pending_trade"] = {
                     "from": pid, "to": to,
                     "offer_money": int(msg.get("offer_money", 0)),
                     "offer_props": [int(x) for x in msg.get("offer_props", [])],
+                    "offer_goojf": offer_goojf,
                     "req_money":   int(msg.get("req_money", 0)),
                     "req_props":   [int(x) for x in msg.get("req_props", [])],
+                    "req_goojf":   req_goojf,
                 }
                 from_name = room["players"][pid]["name"]
                 to_name   = room["players"][to]["name"]
@@ -638,6 +649,9 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 taker["money"] -= t["req_money"];    giver["money"] += t["req_money"]
                 for p in t["offer_props"]: room["owned"][p] = t["to"]
                 for p in t["req_props"]:   room["owned"][p] = t["from"]
+                og, rg = t.get("offer_goojf", 0), t.get("req_goojf", 0)
+                if og: room["goojf"][t["from"]] = max(0, room["goojf"].get(t["from"],0) - og); room["goojf"][t["to"]] = room["goojf"].get(t["to"],0) + og
+                if rg: room["goojf"][t["to"]]   = max(0, room["goojf"].get(t["to"],  0) - rg); room["goojf"][t["from"]] = room["goojf"].get(t["from"],0) + rg
                 room["pending_trade"] = None
                 await broadcast(rid, {"event": "chat", "msg": f"✅ Échange accepté entre {giver['name']} et {taker['name']}!"})
                 await broadcast(rid, get_state(rid))
