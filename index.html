@@ -248,8 +248,11 @@ body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
       <button id="btn-buy"   onclick="send('buy')"   disabled>Acheter la propriété</button>
       <button id="btn-skip"  onclick="send('auction')" disabled>🔨 Enchère</button>
       <button id="btn-trade" onclick="openTrade()" disabled>🤝 Proposer un échange</button>
-      <button id="btn-goojf"   onclick="send('use_goojf')" disabled>🎫 Carte Sortie de Prison</button>
-      <button id="btn-payjail" onclick="send('pay_jail')" disabled>💰 Payer 50$ (sortir de prison)</button>
+      <div id="jail-section" style="display:none; flex-direction:column; gap:6px; border-top:1px solid #e8e8e8; padding-top:6px; margin-top:2px;">
+        <div style="font-size:0.74rem; color:#666; font-style:italic;">🚔 Vous êtes en prison :</div>
+        <button id="btn-goojf"   onclick="send('use_goojf')" disabled>🎫 Utiliser ma carte Sortie de Prison</button>
+        <button id="btn-payjail" onclick="send('pay_jail')"  disabled>💰 Payer 50$ et finir mon tour</button>
+      </div>
       <button id="btn-build"     onclick="openBuild()"     disabled>🏗️ Construire / Vendre</button>
       <button id="btn-inventory" onclick="openInventory()">📋 Mes propriétés / Hypothèques</button>
     </div>
@@ -441,9 +444,12 @@ function render(s){
   document.getElementById('btn-roll').disabled    = !s.started || (!isMyTurn && !extraRoll) || canBuy || hasTax;
   document.getElementById('btn-buy').disabled     = !canBuy || !canAfford;
   document.getElementById('btn-skip').disabled    = !canBuy;
-  document.getElementById('btn-goojf').disabled   = !amInJail || !hasGoojf;
-  document.getElementById('btn-payjail').disabled = !amInJail || (me?.money < 50);
-  document.getElementById('btn-trade').disabled = !s.started || s.players.filter(p=>p.id!==myPid&&!p.bankrupt).length===0;
+  const jailSection = document.getElementById('jail-section');
+  jailSection.style.display = amInJail ? 'flex' : 'none';
+  document.getElementById('btn-goojf').disabled   = !hasGoojf;
+  document.getElementById('btn-payjail').disabled = (me?.money < 50);
+  const hasOtherPlayers = s.players.filter(p=>p.id!==myPid&&!p.bankrupt).length > 0;
+  document.getElementById('btn-trade').disabled = !s.started || !hasOtherPlayers || (!!me?.in_jail && !isMyTurn);
   const myOwned = Object.entries(s.owned||{}).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
   const hasMonopoly = Object.keys(GROUP_MEMBERS).some(grp=>GROUP_MEMBERS[grp].every(p=>s.owned[p]===myPid));
   document.getElementById('btn-build').disabled = !s.started || !hasMonopoly;
