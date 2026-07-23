@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Monopoly Online</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div id="join">
+  <h1>Monopoly Online</h1>
+  <input id="inp-name" placeholder="Votre prénom" />
+  <input id="inp-room" placeholder="Code de la salle (ex: partie1)" />
+  <button onclick="join()">Rejoindre / Créer</button>
+</div>
+
+<div id="game">
+  <div id="board"></div>
+  <div id="panel">
+    <div id="players-box"><h3>Joueurs</h3><div id="players"></div></div>
+    <div id="controls">
+      <h3>Actions</h3>
+      <button id="btn-start" onclick="send('start')">Démarrer (2 joueurs min.)</button>
+      <button id="btn-roll"  onclick="send('roll')"  disabled>Lancer les dés</button>
+      <button id="btn-buy"   onclick="send('buy')"   disabled>Acheter la propriété</button>
+      <button id="btn-skip"  onclick="send('auction')" disabled>🔨 Enchère</button>
+      <button id="btn-trade" onclick="openTrade()" disabled>🤝 Proposer un échange</button>
+      <div id="jail-section" style="display:none; flex-direction:column; gap:6px; border-top:1px solid #e8e8e8; padding-top:6px; margin-top:2px;">
+        <div style="font-size:0.74rem; color:#666; font-style:italic;">🚔 Vous êtes en prison :</div>
+        <button id="btn-goojf"   onclick="send('use_goojf')" disabled>🎫 Utiliser ma carte Sortie de Prison</button>
+        <button id="btn-payjail" onclick="send('pay_jail')"  disabled>💰 Payer 50$ et finir mon tour</button>
+      </div>
+      <button id="btn-build"     onclick="openBuild()"     disabled>🏗️ Construire / Vendre</button>
+      <button id="btn-inventory" onclick="openInventory()">📋 Mes propriétés / Hypothèques</button>
+    </div>
+    <div id="auction-panel">
+      <h4>🔨 Enchère en cours : <span id="auction-prop"></span></h4>
+      <div>Temps restant : <span id="auction-timer">60</span>s</div>
+      <div id="auction-waiting"></div>
+      <div id="auction-bid-row">
+        <input type="number" id="auction-amount" min="0" placeholder="Votre mise ($)" />
+        <button class="submit" onclick="submitBid()">Miser</button>
+        <button onclick="submitBid(0)">Sauter</button>
+      </div>
+      <div id="auction-submitted"></div>
+    </div>
+
+    <div id="trade-incoming">
+      <h4>🤝 Échange proposé</h4>
+      <div id="ti-details"></div>
+      <div class="ti-actions">
+        <button class="accept" onclick="send('trade_accept')">Accepter</button>
+        <button onclick="send('trade_reject')">Refuser</button>
+      </div>
+    </div>
+
+    <div id="log-box">
+      <h3>Journal</h3>
+      <div id="log"></div>
+      <div id="chat-row">
+        <input id="chat-in" placeholder="Message..." onkeydown="if(event.key==='Enter')chat()"/>
+        <button id="chat-btn" onclick="chat()">Envoyer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="win-overlay">
+  <div id="win-box">
+    <h1>🏆 Partie terminée!</h1>
+    <p id="win-msg"></p>
+    <button onclick="document.getElementById('win-overlay').classList.remove('open')">Fermer</button>
+  </div>
+</div>
+
+<div id="tax-overlay">
+  <div id="tax-modal">
+    <h2>💸 Taxe sur le revenu</h2>
+    <div class="tax-info" id="tax-info"></div>
+    <div class="tax-options">
+      <button onclick="send('tax_flat')">Payer 200$ fixe</button>
+      <button class="primary" onclick="send('tax_pct')">Payer <span id="tax-pct-amount"></span> (10%)</button>
+    </div>
+  </div>
+</div>
+
+<div id="inventory-overlay">
+  <div id="inventory-modal">
+    <h2>📋 Mes propriétés</h2>
+    <div id="inventory-content"></div>
+    <button class="close-btn" onclick="document.getElementById('inventory-overlay').classList.remove('open')">Fermer</button>
+  </div>
+</div>
+
+<div id="build-overlay">
+  <div id="build-modal">
+    <h2>🏗️ Construire / Vendre des maisons</h2>
+    <div id="build-groups"></div>
+    <button class="close-btn" onclick="closeBuild()">Fermer</button>
+  </div>
+</div>
+
+<div id="trade-overlay">
+  <div id="trade-modal">
+    <h2>🤝 Proposer un échange</h2>
+    <label>Proposer à</label>
+    <select id="trade-target"></select>
+    <div class="trade-cols">
+      <div class="trade-col">
+        <h3>J'offre</h3>
+        <label>Argent ($)</label>
+        <input type="number" id="trade-offer-money" min="0" value="0"/>
+        <label>Propriétés</label>
+        <div class="trade-props" id="trade-offer-props"></div>
+        <label><input type="checkbox" id="trade-offer-goojf"> 🎫 Carte Sortie de Prison</label>
+      </div>
+      <div class="trade-col">
+        <h3>Je demande</h3>
+        <label>Argent ($)</label>
+        <input type="number" id="trade-req-money" min="0" value="0"/>
+        <label>Propriétés</label>
+        <div class="trade-props" id="trade-req-props"></div>
+        <label><input type="checkbox" id="trade-req-goojf"> 🎫 Carte Sortie de Prison</label>
+      </div>
+    </div>
+    <div class="trade-actions">
+      <button onclick="closeTrade()">Annuler</button>
+      <button class="primary" onclick="submitTrade()">Envoyer l'offre</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/game.js"></script>
+</body>
+</html>
