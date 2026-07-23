@@ -151,6 +151,8 @@ def apply_card(rid, pid, card, roll):
         player["pos"] = (player["pos"] - 3) % 40
     elif action == "jail":
         player["pos"] = 10
+        player["in_jail"] = True
+        player["jail_turns"] = 0
         msgs.append("🚔 En prison!")
     elif action == "goojf":
         room["goojf"][pid] = room["goojf"].get(pid, 0) + 1
@@ -283,6 +285,9 @@ def do_move(rid, pid):
 
     if new_pos == 30:
         player["pos"] = 10
+        player["in_jail"] = True
+        player["jail_turns"] = 0
+        can_roll_again = False
         msgs.append("🚔 En prison!")
     elif new_pos in (7, 22, 36):
         card = draw_card(room["chance_deck"])
@@ -550,6 +555,7 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 player["money"] -= 50
                 player["in_jail"] = False
                 player["jail_turns"] = 0
+                room["extra_roll"] = None
                 room["turn"] += 1
                 await broadcast(rid, {"event":"chat","msg":f"🔓 {player['name']} paie 50$ et sort de prison — tour terminé, lancez les dés au prochain tour!"})
                 await broadcast(rid, get_state(rid))
