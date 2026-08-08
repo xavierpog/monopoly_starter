@@ -1,16 +1,6 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, sans-serif; background: #f0f0f0; color: #222; }
 
-#join {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; height: 100vh; gap: 10px;
-}
-#join h1 { font-size: 2rem; margin-bottom: 10px; }
-#join input, #join button {
-  padding: 8px 14px; font-size: 1rem; width: 260px;
-  border: 1px solid #aaa; border-radius: 4px;
-}
-#join button { background: #222; color: #fff; cursor: pointer; }
 
 #game { display: none; padding: 12px; gap: 12px; }
 #game.active { display: grid; grid-template-columns: 1fr 300px; }
