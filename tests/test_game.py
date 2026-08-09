@@ -228,9 +228,9 @@ class TestDoBankruptcy:
 class TestDoMove:
     def test_deplacement_de_base(self, room2):
         rooms[room2]["players"]["p1"]["pos"] = 0
-        with patch("app.random.randint", side_effect=dice(3, 4)):  # = 7
+        with patch("app.random.randint", side_effect=dice(3, 5)):  # = 8 (Vermont, propriété sans carte)
             do_move(room2, "p1")
-        assert rooms[room2]["players"]["p1"]["pos"] == 7
+        assert rooms[room2]["players"]["p1"]["pos"] == 8
 
     def test_propriete_a_vendre_retourne_buy_pos(self, room2):
         rooms[room2]["players"]["p1"]["pos"] = 0

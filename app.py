@@ -485,7 +485,9 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
             cmd, room = msg.get("cmd"), rooms[rid]
             if cmd == "start" and not room["started"] and len(room["players"]) >= 2:
                 room["started"] = True
-                await broadcast(rid, {"event": "chat", "msg": "🎮 La partie commence!"})
+                random.shuffle(room["order"])
+                first = room["players"][room["order"][0]]["name"]
+                await broadcast(rid, {"event": "chat", "msg": f"🎮 La partie commence! Ordre aléatoire — {first} joue en premier."})
                 await broadcast(rid, get_state(rid))
             elif cmd == "roll":
                 cur = room["order"][room["turn"] % len(room["order"])]
