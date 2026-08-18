@@ -253,6 +253,14 @@ class TestDoMove:
         assert can_roll is False  # doubles n'accordent pas de relance quand on va en prison
         assert any("prison" in m.lower() for m in msgs)
 
+    def test_double_carte_jail_annule_relance(self, room2):
+        rooms[room2]["players"]["p1"]["pos"] = 1
+        rooms[room2]["chance_deck"].insert(0, {"action": "jail", "text": "Allez en Prison."})
+        with patch("app.random.randint", side_effect=dice(3, 3)):  # 1+6 = 7 (Chance)
+            _, _, can_roll = do_move(room2, "p1")
+        assert rooms[room2]["players"]["p1"]["in_jail"] is True
+        assert can_roll is False
+
     def test_double_permet_de_rejouer(self, room2):
         rooms[room2]["players"]["p1"]["pos"] = 0
         with patch("app.random.randint", side_effect=dice(3, 3)):

@@ -341,6 +341,9 @@ def do_move(rid, pid):
             msgs.append(f"💸 Taxe de luxe : 100$ payés.")
             if player["money"] <= 0: msgs += do_bankruptcy(rid, pid)
 
+    if player["in_jail"] and not was_in_jail:
+        can_roll_again = False
+
     return msgs, pending_buy_pos, can_roll_again
 
 # Élimine un joueur : retourne ses maisons et propriétés à la banque, le retire de l'ordre, vérifie la victoire
