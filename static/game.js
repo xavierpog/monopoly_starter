@@ -19,8 +19,8 @@ const PROPS = {
   26:{n:"Atlantic",c:"yellow",p:260},   27:{n:"Ventnor",c:"yellow",p:260}, 29:{n:"Marvin",c:"yellow",p:280},
   31:{n:"Pacific",c:"green",p:300},     32:{n:"Caroline N.",c:"green",p:300}, 34:{n:"Pennsylvanie",c:"green",p:320},
   37:{n:"Park",c:"darkblue",p:350},     39:{n:"Boulevard",c:"darkblue",p:400},
-  5:{n:"Gare 1",c:"station",p:200},    15:{n:"Gare 2",c:"station",p:200},
-  25:{n:"Gare 3",c:"station",p:200},   35:{n:"Gare 4",c:"station",p:200},
+  5:{n:"Reading Railroad",c:"station",p:200},    15:{n:"Pennsylvania Railroad",c:"station",p:200},
+  25:{n:"B&O Railroad",c:"station",p:200},       35:{n:"Short Line Railroad",c:"station",p:200},
   12:{n:"Cie Électrique",c:"utility",p:150}, 28:{n:"Cie des Eaux",c:"utility",p:150},
 };
 const SPEC = {0:"DÉPART",2:"Caisse",4:"Taxes",7:"Chance",8:"Vermont",10:"Prison",

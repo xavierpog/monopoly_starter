@@ -8,7 +8,7 @@
 
 ```bash
 # 1. Placer les 3 fichiers dans un même dossier :
-#    app.py  |  index.html  |  requirements.txt
+#    app.py  |  static | index.html |  requirements.txt
 
 # 2. Installer les dépendances
 pip install -r requirements.txt
