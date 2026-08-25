@@ -354,11 +354,16 @@ function openTrade(){
   sel.innerHTML = gs.players.filter(p=>p.id!==myPid && !p.bankrupt)
     .map(p=>`<option value="${esc(p.id)}">${p.icon} ${esc(p.name)}</option>`).join('');
 
-  // My properties
+  const me = gs.players.find(p=>p.id===myPid);
+  const myGoojf = me?.goojf || 0;
   const myProps = Object.entries(gs.owned).filter(([,owner])=>owner===myPid).map(([k])=>k);
-  document.getElementById('trade-offer-props').innerHTML = myProps.length
-    ? myProps.map(k=>`<label><input type="checkbox" value="${k}"> ${PROP_NAMES[k]||'#'+k}</label>`).join('')
-    : '<em style="color:#aaa;font-size:.8rem">Aucune propriété</em>';
+  const offerItems = [
+    ...myProps.map(k=>`<label><input type="checkbox" value="${k}"> ${PROP_NAMES[k]||'#'+k}</label>`),
+    ...(myGoojf > 0 ? [`<label><input type="checkbox" value="goojf"> 🎫 Sortie de Prison${myGoojf>1?' ×'+myGoojf:''}</label>`] : [])
+  ];
+  document.getElementById('trade-offer-props').innerHTML = offerItems.length
+    ? offerItems.join('')
+    : '<em style="color:#aaa;font-size:.8rem">Aucun élément</em>';
 
   document.getElementById('trade-offer-money').value = 0;
   document.getElementById('trade-req-money').value = 0;
@@ -371,10 +376,16 @@ function openTrade(){
 function renderReqProps(){
   const targetId = document.getElementById('trade-target').value;
   if(!targetId || !gs) return;
+  const target = gs.players.find(p=>p.id===targetId);
+  const theirGoojf = target?.goojf || 0;
   const theirProps = Object.entries(gs.owned).filter(([,owner])=>owner===targetId).map(([k])=>k);
-  document.getElementById('trade-req-props').innerHTML = theirProps.length
-    ? theirProps.map(k=>`<label><input type="checkbox" value="${k}"> ${PROP_NAMES[k]||'#'+k}</label>`).join('')
-    : '<em style="color:#aaa;font-size:.8rem">Aucune propriété</em>';
+  const reqItems = [
+    ...theirProps.map(k=>`<label><input type="checkbox" value="${k}"> ${PROP_NAMES[k]||'#'+k}</label>`),
+    ...(theirGoojf > 0 ? [`<label><input type="checkbox" value="goojf"> 🎫 Sortie de Prison${theirGoojf>1?' ×'+theirGoojf:''}</label>`] : [])
+  ];
+  document.getElementById('trade-req-props').innerHTML = reqItems.length
+    ? reqItems.join('')
+    : '<em style="color:#aaa;font-size:.8rem">Aucun élément</em>';
 }
 
 // Ferme le modal d'échange
@@ -385,10 +396,12 @@ function submitTrade(){
   const to = document.getElementById('trade-target').value;
   const offerMoney = parseInt(document.getElementById('trade-offer-money').value)||0;
   const reqMoney   = parseInt(document.getElementById('trade-req-money').value)||0;
-  const offerProps = [...document.querySelectorAll('#trade-offer-props input:checked')].map(i=>parseInt(i.value));
-  const reqProps   = [...document.querySelectorAll('#trade-req-props input:checked')].map(i=>parseInt(i.value));
-  const offerGoojf = document.getElementById('trade-offer-goojf').checked ? 1 : 0;
-  const reqGoojf   = document.getElementById('trade-req-goojf').checked ? 1 : 0;
+  const offerChecked = [...document.querySelectorAll('#trade-offer-props input:checked')].map(i=>i.value);
+  const reqChecked   = [...document.querySelectorAll('#trade-req-props input:checked')].map(i=>i.value);
+  const offerProps = offerChecked.filter(v=>v!=='goojf').map(v=>parseInt(v));
+  const reqProps   = reqChecked.filter(v=>v!=='goojf').map(v=>parseInt(v));
+  const offerGoojf = offerChecked.includes('goojf') ? 1 : 0;
+  const reqGoojf   = reqChecked.includes('goojf') ? 1 : 0;
   ws?.send(JSON.stringify({cmd:'trade_offer', to, offer_money:offerMoney, offer_props:offerProps, offer_goojf:offerGoojf, req_money:reqMoney, req_props:reqProps, req_goojf:reqGoojf}));
   closeTrade();
 }
