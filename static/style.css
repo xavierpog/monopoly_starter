@@ -40,7 +40,7 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #12151E; }
 .color-bar { width: 100%; height: 10px; position: absolute; top: 0; }
 .sq-label { margin-top: 12px; line-height: 1.3; }
 .sq-price { color: #666; font-size: 0.56rem; }
-.sq.owned { outline: 2px solid #E8B84B; }
+.sq.owned { outline-offset: -2px; }
 .pions { position: absolute; bottom: 2px; right: 3px; font-size: 0.9rem; }
 .center-cell {
   grid-column: 2/11;

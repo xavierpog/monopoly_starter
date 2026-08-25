@@ -132,9 +132,20 @@ function render(s){
   // Pions
   document.querySelectorAll('.pions').forEach(e=>e.textContent='');
   s.players.forEach(p=>{ const el=document.getElementById(`p${p.pos}`); if(el) el.textContent+=p.icon; });
-  // Owned
-  document.querySelectorAll('.sq').forEach(e=>e.classList.remove('owned'));
-  Object.keys(s.owned).forEach(k=>{ const sq=document.querySelector(`[data-i="${k}"]`); if(sq) sq.classList.add('owned'); });
+  // Owned — contour coloré par joueur
+  const ICON_COLOR = {'🔴':'#ef4444','🔵':'#3b82f6','🟢':'#22c55e','🟡':'#eab308','🟠':'#f97316','🟣':'#a855f7','⚫':'#6b7280','🟤':'#92400e'};
+  const pidColor = {};
+  s.players.forEach(p => { pidColor[p.id] = ICON_COLOR[p.icon] || '#E8B84B'; });
+  document.querySelectorAll('.sq').forEach(e => {
+    e.classList.remove('owned');
+    e.style.outline = '';
+  });
+  Object.entries(s.owned).forEach(([k, pid]) => {
+    const sq = document.querySelector(`[data-i="${k}"]`);
+    if (!sq) return;
+    sq.classList.add('owned');
+    sq.style.outline = `3px solid ${pidColor[pid] || '#E8B84B'}`;
+  });
   // Houses
   document.querySelectorAll('.houses-display').forEach(e=>e.remove());
   Object.entries(s.houses||{}).forEach(([k,n])=>{

@@ -223,10 +223,10 @@ def apply_card(rid, pid, card, roll):
 
 # Crée un joueur avec 1500$, position 0, et l'ajoute à la salle
 def add_player(rid, pid, name):
-    icons = ["🔴", "🔵", "🟢", "🟡"]
+    icons = ["🔴", "🔵", "🟢", "🟡", "🟠", "🟣", "⚫", "🟤"]
     rooms[rid]["players"][pid] = {
         "id": pid, "name": name, "money": 1500, "pos": 0,
-        "icon": icons[len(rooms[rid]["players"]) % 4], "bankrupt": False,
+        "icon": icons[len(rooms[rid]["players"]) % 8], "bankrupt": False,
         "in_jail": False, "jail_turns": 0, "doubles_streak": 0,
     }
     rooms[rid]["order"].append(pid)
@@ -485,6 +485,10 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
         await broadcast(rid, {"event": "chat", "msg": f"🔄 {name} a reconnecté!"})
     elif room["started"]:
         await ws.send_json({"event": "error", "msg": "Partie en cours — utilisez votre nom d'origine pour rejoindre."})
+        await ws.close()
+        return
+    elif len(room["players"]) >= 8:
+        await ws.send_json({"event": "error", "msg": "La salle est pleine (8 joueurs maximum)."})
         await ws.close()
         return
     else:
