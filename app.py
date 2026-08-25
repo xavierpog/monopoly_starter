@@ -6,7 +6,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
-app.mount("/static", StaticFiles(directory="static"), name="static")
+BASE_DIR = Path(__file__).parent
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 CHANCE_CARDS = [
     {"id":"c1",  "text":"Avancez jusqu'au Boulevard. Si vous passez par DÉPART, recevez 200$.", "action":"goto", "dest":39},
@@ -465,22 +466,33 @@ async def broadcast(rid, data):
 
 @app.get("/")
 async def index():
-    return FileResponse("static/index.html")
+    return FileResponse(BASE_DIR / "static/index.html")
 
 @app.websocket("/ws/{rid}/{name}")
 async def ws_ep(ws: WebSocket, rid: str, name: str):
-    # Sanitise room code: alphanumeric + hyphens only, max 30 chars
     rid = re.sub(r"[^a-zA-Z0-9_-]", "", rid)[:30] or "default"
-    # Sanitise player name: strip tags, collapse whitespace, max 20 chars
     name = re.sub(r"\s+", " ", html_lib.escape(name[:40])).strip()[:20] or "Joueur"
     await ws.accept()
     if rid not in rooms:
         new_room(rid)
-    pid = str(uuid.uuid4())[:8]
-    add_player(rid, pid, name)
-    conns[rid].add(ws)
-    await ws.send_json({"event": "joined", "pid": pid})
-    await broadcast(rid, {"event": "chat", "msg": f"👤 {name} a rejoint!"})
+    room = rooms[rid]
+    # Reconnexion : joueur avec ce nom existe déjà → reprend son état
+    existing_pid = next((p for p, d in room["players"].items() if d["name"] == name), None)
+    if existing_pid is not None:
+        pid = existing_pid
+        conns[rid].add(ws)
+        await ws.send_json({"event": "joined", "pid": pid, "reconnect": True})
+        await broadcast(rid, {"event": "chat", "msg": f"🔄 {name} a reconnecté!"})
+    elif room["started"]:
+        await ws.send_json({"event": "error", "msg": "Partie en cours — utilisez votre nom d'origine pour rejoindre."})
+        await ws.close()
+        return
+    else:
+        pid = str(uuid.uuid4())[:8]
+        add_player(rid, pid, name)
+        conns[rid].add(ws)
+        await ws.send_json({"event": "joined", "pid": pid})
+        await broadcast(rid, {"event": "chat", "msg": f"👤 {name} a rejoint!"})
     await broadcast(rid, get_state(rid))
     try:
         while True:

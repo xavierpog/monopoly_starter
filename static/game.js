@@ -8,7 +8,7 @@ function esc(s) {
     .replace(/'/g, '&#39;');
 }
 
-let ws, myPid, gs;
+let ws, myPid, gs, myName, myRoom, reconnectDelay = 1000;
 
 const PROPS = {
   1:{n:"Méditerranée",c:"brown",p:60},  3:{n:"Baltic",c:"brown",p:60},
@@ -410,12 +410,18 @@ function renderIncomingTrade(trade, players){
   el.classList.add('open');
 }
 
-// Connecte le joueur au serveur WebSocket et s'abonne aux événements de la partie
+// Lit les champs du formulaire et démarre la connexion
 function join(){
-  const name=document.getElementById('inp-name').value.trim();
-  const room=document.getElementById('inp-room').value.trim();
-  if(!name||!room){ alert('Remplissez les deux champs.'); return; }
-  ws = new WebSocket(`ws://${location.host}/ws/${encodeURIComponent(room)}/${encodeURIComponent(name)}`);
+  myName = document.getElementById('inp-name').value.trim();
+  myRoom = document.getElementById('inp-room').value.trim();
+  if(!myName||!myRoom){ alert('Remplissez les deux champs.'); return; }
+  connectWs();
+}
+
+// Crée le WebSocket et gère la reconnexion automatique en cas de déconnexion
+function connectWs(){
+  ws = new WebSocket(`ws://${location.host}/ws/${encodeURIComponent(myRoom)}/${encodeURIComponent(myName)}`);
+  ws.onopen = () => { reconnectDelay = 1000; };
   ws.onmessage = e => {
     const m = JSON.parse(e.data);
     if(m.event==='joined'){
@@ -425,6 +431,16 @@ function join(){
       buildBoard();
     } else if(m.event==='state'){ render(m); }
     else if(m.event==='chat'){ log(m.msg); }
+    else if(m.event==='error'){ alert(m.msg); }
   };
-  ws.onclose=()=>log('🔌 Déconnecté.');
+  ws.onclose = () => {
+    if(myPid){
+      const d = reconnectDelay;
+      reconnectDelay = Math.min(reconnectDelay * 2, 16000);
+      log(`🔌 Connexion perdue — reconnexion dans ${d/1000}s…`);
+      setTimeout(connectWs, d);
+    } else {
+      log('🔌 Déconnecté.');
+    }
+  };
 }
