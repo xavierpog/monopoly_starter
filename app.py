@@ -132,7 +132,7 @@ def nearest(pos, targets):
 # Exécute l'action d'une carte Chance ou Caisse — retourne (messages, case à acheter ou None)
 def apply_card(rid, pid, card, roll):
     room, player = rooms[rid], rooms[rid]["players"][pid]
-    msgs = [f"🃏 {card['text']}"]
+    msgs = [f" {card['text']}"]
     action = card["action"]
 
     if action == "gain":
@@ -144,20 +144,20 @@ def apply_card(rid, pid, card, roll):
     elif action == "goto":
         dest = card["dest"]
         if dest <= player["pos"] and dest != player["pos"]:
-            player["money"] += 200; msgs.append("✅ Passage DÉPART +200$")
+            player["money"] += 200; msgs.append(" Passage DÉPART +200$")
         player["pos"] = dest
         if dest == 0:
-            player["money"] += 200; msgs.append("✅ Passage DÉPART +200$")
+            player["money"] += 200; msgs.append(" Passage DÉPART +200$")
     elif action == "back3":
         player["pos"] = (player["pos"] - 3) % 40
     elif action == "jail":
         player["pos"] = 10
         player["in_jail"] = True
         player["jail_turns"] = 0
-        msgs.append("🚔 En prison!")
+        msgs.append(" En prison!")
     elif action == "goojf":
         room["goojf"][pid] = room["goojf"].get(pid, 0) + 1
-        msgs.append("🎫 Carte Sortie de Prison conservée.")
+        msgs.append(" Carte Sortie de Prison conservée.")
     elif action == "pay_all":
         amt = card["amount"]
         others = [p for p in room["players"].values() if p["id"] != pid and not p["bankrupt"]]
@@ -178,52 +178,52 @@ def apply_card(rid, pid, card, roll):
                 total += card["hotel"] if count == 5 else count * card["house"]
         if total > 0:
             player["money"] -= total
-            msgs.append(f"🔨 Réparations : {total}$ payés.")
+            msgs.append(f" Réparations : {total}$ payés.")
             if player["money"] <= 0:
                 msgs += do_bankruptcy(rid, pid)
     elif action == "nearest_railroad":
         dest = nearest(player["pos"], RAILROADS)
         if dest <= player["pos"]:
-            player["money"] += 200; msgs.append("✅ Passage DÉPART +200$")
+            player["money"] += 200; msgs.append(" Passage DÉPART +200$")
         player["pos"] = dest
         owner = room["owned"].get(dest)
         if owner and owner != pid:
             if room.get("mortgaged", {}).get(dest):
-                msgs.append(f"🏦 Gare hypothéquée — pas de loyer.")
+                msgs.append(f" Gare hypothéquée — pas de loyer.")
             else:
                 count = sum(1 for r in RAILROADS if room["owned"].get(r) == owner and not room.get("mortgaged", {}).get(r))
                 rent = 25 * (2 ** count)  # double from Chance card
                 player["money"] -= rent; room["players"][owner]["money"] += rent
-                msgs.append(f"💸 Double loyer gare {rent}$ → {room['players'][owner]['name']}")
+                msgs.append(f" Double loyer gare {rent}$ → {room['players'][owner]['name']}")
                 if player["money"] <= 0:
                     msgs += do_bankruptcy(rid, pid)
         elif owner is None:
-            msgs.append(f"🏠 {PROPERTIES[dest]['name']} à vendre — cliquez Acheter")
+            msgs.append(f" {PROPERTIES[dest]['name']} à vendre — cliquez Acheter")
             return msgs, dest
     elif action == "nearest_utility":
         dest = nearest(player["pos"], UTILITIES)
         if dest <= player["pos"]:
-            player["money"] += 200; msgs.append("✅ Passage DÉPART +200$")
+            player["money"] += 200; msgs.append(" Passage DÉPART +200$")
         player["pos"] = dest
         owner = room["owned"].get(dest)
         if owner and owner != pid:
             if room.get("mortgaged", {}).get(dest):
-                msgs.append(f"🏦 Service hypothéqué — pas de loyer.")
+                msgs.append(f" Service hypothéqué — pas de loyer.")
             else:
                 rent = roll * 10
                 player["money"] -= rent; room["players"][owner]["money"] += rent
-                msgs.append(f"💸 {rent}$ (10× dés) → {room['players'][owner]['name']}")
+                msgs.append(f" {rent}$ (10× dés) → {room['players'][owner]['name']}")
                 if player["money"] <= 0:
                     msgs += do_bankruptcy(rid, pid)
         elif owner is None:
-            msgs.append(f"🏠 {PROPERTIES[dest]['name']} à vendre — cliquez Acheter")
+            msgs.append(f" {PROPERTIES[dest]['name']} à vendre — cliquez Acheter")
             return msgs, dest
 
     return msgs, None  # None = no pending buy
 
 # Crée un joueur avec 1500$, position 0, et l'ajoute à la salle
 def add_player(rid, pid, name):
-    icons = ["🔴", "🔵", "🟢", "🟡", "🟠", "🟣", "⚫", "🟤"]
+    icons = ["red","blue","green","yellow","orange","purple","gray","brown"]
     rooms[rid]["players"][pid] = {
         "id": pid, "name": name, "money": 1500, "pos": 0,
         "icon": icons[len(rooms[rid]["players"]) % 8], "bankrupt": False,
@@ -238,7 +238,7 @@ def do_move(rid, pid):
     d1, d2 = random.randint(1, 6), random.randint(1, 6)
     roll = d1 + d2
     doubles = (d1 == d2)
-    msgs = [f"🎲 {player['name']} fait {d1}+{d2}{'  🎯 Double!' if doubles else ''}"]
+    msgs = [f" {player['name']} fait {d1}+{d2}{'   Double!' if doubles else ''}"]
     pending_buy_pos = None
 
     was_in_jail = player["in_jail"]
@@ -250,7 +250,7 @@ def do_move(rid, pid):
             player["in_jail"] = False
             player["jail_turns"] = 0
             player["doubles_streak"] = 0
-            msgs.append("🔓 Double! Vous sortez de prison!")
+            msgs.append(" Double! Vous sortez de prison!")
             # pas de relancer après sortie de prison
         else:
             player["jail_turns"] += 1
@@ -258,9 +258,9 @@ def do_move(rid, pid):
                 player["money"] -= 50
                 player["in_jail"] = False
                 player["jail_turns"] = 0
-                msgs.append("🚔 3 tours en prison — 50$ payés automatiquement, vous sortez.")
+                msgs.append(" 3 tours en prison — 50$ payés automatiquement, vous sortez.")
             else:
-                msgs.append(f"🚔 Pas de double — vous restez en prison ({player['jail_turns']}/3 tours).")
+                msgs.append(f" Pas de double — vous restez en prison ({player['jail_turns']}/3 tours).")
                 return msgs, None, False
     else:
         # --- Vérifier 3 doubles consécutifs ---
@@ -270,7 +270,7 @@ def do_move(rid, pid):
                 player["pos"] = 10
                 player["in_jail"] = True
                 player["doubles_streak"] = 0
-                msgs.append("🚔 3 doubles de suite — En prison!")
+                msgs.append(" 3 doubles de suite — En prison!")
                 return msgs, None, False
             else:
                 can_roll_again = True
@@ -281,7 +281,7 @@ def do_move(rid, pid):
     msgs[0] += f" → case {new_pos}"
     if new_pos < player["pos"]:
         player["money"] += 200
-        msgs.append("✅ Passage DÉPART +200$")
+        msgs.append(" Passage DÉPART +200$")
     player["pos"] = new_pos
 
     if new_pos == 30:
@@ -289,7 +289,7 @@ def do_move(rid, pid):
         player["in_jail"] = True
         player["jail_turns"] = 0
         can_roll_again = False
-        msgs.append("🚔 En prison!")
+        msgs.append(" En prison!")
     elif new_pos in (7, 22, 36):
         card = draw_card(room["chance_deck"])
         card_msgs, buy_pos = apply_card(rid, pid, card, roll)
@@ -304,11 +304,11 @@ def do_move(rid, pid):
         p = PROPERTIES[new_pos]
         owner = room["owned"].get(new_pos)
         if owner is None:
-            msgs.append(f"🏠 {p['name']} à vendre ({p['price']}$) — cliquez Acheter")
+            msgs.append(f" {p['name']} à vendre ({p['price']}$) — cliquez Acheter")
             pending_buy_pos = new_pos
         elif owner != pid:
             if room.get("mortgaged", {}).get(new_pos):
-                msgs.append(f"🏦 {p['name']} est hypothéquée — pas de loyer.")
+                msgs.append(f" {p['name']} est hypothéquée — pas de loyer.")
             else:
                 o = room["players"][owner]
                 if p.get("utility"):
@@ -327,19 +327,19 @@ def do_move(rid, pid):
                     rent = base_rent
                 player["money"] -= rent
                 o["money"] += rent
-                msgs.append(f"💸 Loyer {rent}$ → {o['name']}")
+                msgs.append(f" Loyer {rent}$ → {o['name']}")
                 if player["money"] <= 0:
                     msgs += do_bankruptcy(rid, pid)
         else:
-            msgs.append(f"🏠 Votre propriété : {p['name']}")
+            msgs.append(f" Votre propriété : {p['name']}")
     elif new_pos in SPECIAL:
-        msgs.append(f"⭐ {SPECIAL[new_pos]}")
+        msgs.append(f" {SPECIAL[new_pos]}")
         if new_pos == 4:
             room["pending_tax"] = pid
-            msgs.append("⚠️ Choisissez : Payer 200$ (fixe) ou 10% de vos avoirs totaux.")
+            msgs.append(" Choisissez : Payer 200$ (fixe) ou 10% de vos avoirs totaux.")
         elif new_pos == 38:
             player["money"] -= 100
-            msgs.append(f"💸 Taxe de luxe : 100$ payés.")
+            msgs.append(f" Taxe de luxe : 100$ payés.")
             if player["money"] <= 0: msgs += do_bankruptcy(rid, pid)
 
     if player["in_jail"] and not was_in_jail:
@@ -370,25 +370,25 @@ def do_bankruptcy(rid, pid):
         room["order"].remove(pid)
     if room["order"] and room["turn"] >= len(room["order"]):
         room["turn"] %= len(room["order"])
-    msgs = [f"💀 {player['name']} est en faillite! Ses propriétés retournent à la banque."]
+    msgs = [f" {player['name']} est en faillite! Ses propriétés retournent à la banque."]
     active = [p for p in room["players"].values() if not p["bankrupt"]]
     if len(active) == 1:
         room["game_over"] = True
         room["winner"] = active[0]["id"]
-        msgs.append(f"🏆 {active[0]['name']} remporte la partie!")
+        msgs.append(f" {active[0]['name']} remporte la partie!")
     return msgs
 
 # Achète la propriété sur laquelle se trouve le joueur courant
 def do_buy(rid, pid):
     room, player = rooms[rid], rooms[rid]["players"][pid]
     pos = player["pos"]
-    if pos not in PROPERTIES: return "❌ Pas achetable."
-    if pos in room["owned"]: return "❌ Déjà vendu."
+    if pos not in PROPERTIES: return " Pas achetable."
+    if pos in room["owned"]: return " Déjà vendu."
     p = PROPERTIES[pos]
-    if player["money"] < p["price"]: return f"❌ Pas assez d'argent ({p['price']}$ requis)."
+    if player["money"] < p["price"]: return f" Pas assez d'argent ({p['price']}$ requis)."
     player["money"] -= p["price"]
     room["owned"][pos] = pid
-    return f"✅ {player['name']} achète {p['name']} pour {p['price']}$"
+    return f" {player['name']} achète {p['name']} pour {p['price']}$"
 
 # Sérialise l'état d'enchère en excluant la tâche asyncio (non JSON-sérialisable)
 def get_auction_state(room):
@@ -437,7 +437,7 @@ async def end_auction(rid):
         if p not in bids:
             bids[p] = 0
     if not bids or all(v == 0 for v in bids.values()):
-        await broadcast(rid, {"event": "chat", "msg": f"🔨 Enchère terminée — aucune offre. {PROPERTIES[a['pos']]['name']} reste disponible."})
+        await broadcast(rid, {"event": "chat", "msg": f" Enchère terminée — aucune offre. {PROPERTIES[a['pos']]['name']} reste disponible."})
         room["turn"] += 1
         await broadcast(rid, get_state(rid))
         return
@@ -446,13 +446,13 @@ async def end_auction(rid):
     winner = room["players"][winner_pid]
     # Reveal all bids
     reveal = " | ".join(f"{room['players'][p]['icon']} {room['players'][p]['name']}: {bids[p]}$" for p in bids)
-    await broadcast(rid, {"event": "chat", "msg": f"🔨 Résultats enchère : {reveal}"})
+    await broadcast(rid, {"event": "chat", "msg": f" Résultats enchère : {reveal}"})
     if winner["money"] < winner_amount:
-        await broadcast(rid, {"event": "chat", "msg": f"❌ {winner['name']} n'a pas assez d'argent. Terrain non vendu."})
+        await broadcast(rid, {"event": "chat", "msg": f" {winner['name']} n'a pas assez d'argent. Terrain non vendu."})
     else:
         winner["money"] -= winner_amount
         room["owned"][a["pos"]] = winner_pid
-        await broadcast(rid, {"event": "chat", "msg": f"🏆 {winner['name']} remporte {PROPERTIES[a['pos']]['name']} pour {winner_amount}$!"})
+        await broadcast(rid, {"event": "chat", "msg": f" {winner['name']} remporte {PROPERTIES[a['pos']]['name']} pour {winner_amount}$!"})
     room["turn"] += 1
     await broadcast(rid, get_state(rid))
 
@@ -482,7 +482,7 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
         pid = existing_pid
         conns[rid].add(ws)
         await ws.send_json({"event": "joined", "pid": pid, "reconnect": True})
-        await broadcast(rid, {"event": "chat", "msg": f"🔄 {name} a reconnecté!"})
+        await broadcast(rid, {"event": "chat", "msg": f" {name} a reconnecté!"})
     elif room["started"]:
         await ws.send_json({"event": "error", "msg": "Partie en cours — utilisez votre nom d'origine pour rejoindre."})
         await ws.close()
@@ -496,7 +496,7 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
         add_player(rid, pid, name)
         conns[rid].add(ws)
         await ws.send_json({"event": "joined", "pid": pid})
-        await broadcast(rid, {"event": "chat", "msg": f"👤 {name} a rejoint!"})
+        await broadcast(rid, {"event": "chat", "msg": f" {name} a rejoint!"})
     await broadcast(rid, get_state(rid))
     try:
         while True:
@@ -506,15 +506,15 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 room["started"] = True
                 random.shuffle(room["order"])
                 first = room["players"][room["order"][0]]["name"]
-                await broadcast(rid, {"event": "chat", "msg": f"🎮 La partie commence! Ordre aléatoire — {first} joue en premier."})
+                await broadcast(rid, {"event": "chat", "msg": f" La partie commence! Ordre aléatoire — {first} joue en premier."})
                 await broadcast(rid, get_state(rid))
             elif cmd == "roll":
                 cur = room["order"][room["turn"] % len(room["order"])]
                 if pid != cur:
-                    await ws.send_json({"event": "chat", "msg": "⚠️ Pas votre tour."})
+                    await ws.send_json({"event": "chat", "msg": " Pas votre tour."})
                     continue
                 if room.get("pending_tax") == pid:
-                    await ws.send_json({"event": "chat", "msg": "⚠️ Payez vos taxes d'abord."})
+                    await ws.send_json({"event": "chat", "msg": " Payez vos taxes d'abord."})
                     continue
                 msgs, pending_buy_pos, can_roll_again = do_move(rid, pid)
                 for m in msgs:
@@ -527,58 +527,58 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                     room["extra_roll"] = pid if can_roll_again else None
                 elif can_roll_again:
                     room["extra_roll"] = pid
-                    await broadcast(rid, {"event": "chat", "msg": "🎯 Double! Vous relancez les dés."})
+                    await broadcast(rid, {"event": "chat", "msg": " Double! Vous relancez les dés."})
                 else:
                     room["extra_roll"] = None
                     room["turn"] += 1
                 await broadcast(rid, get_state(rid))
             elif cmd == "buy":
                 if room.get("pending_buy") != pid:
-                    await ws.send_json({"event": "chat", "msg": "⚠️ Pas votre tour."})
+                    await ws.send_json({"event": "chat", "msg": " Pas votre tour."})
                     continue
                 await broadcast(rid, {"event": "chat", "msg": do_buy(rid, pid)})
                 room["pending_buy"] = None
                 if room.get("extra_roll") == pid:
                     room["extra_roll"] = None
-                    await broadcast(rid, {"event": "chat", "msg": "🎯 Double! Vous relancez les dés."})
+                    await broadcast(rid, {"event": "chat", "msg": " Double! Vous relancez les dés."})
                 else:
                     room["turn"] += 1
                 await broadcast(rid, get_state(rid))
             elif cmd == "use_goojf":
                 cur = room["order"][room["turn"] % len(room["order"])]
                 if pid != cur:
-                    await ws.send_json({"event":"chat","msg":"⚠️ Pas votre tour."})
+                    await ws.send_json({"event":"chat","msg":" Pas votre tour."})
                     continue
                 player = room["players"][pid]
                 if not player["in_jail"]:
-                    await ws.send_json({"event":"chat","msg":"❌ Vous n'êtes pas en prison."})
+                    await ws.send_json({"event":"chat","msg":" Vous n'êtes pas en prison."})
                     continue
                 if room["goojf"].get(pid, 0) < 1:
-                    await ws.send_json({"event":"chat","msg":"❌ Vous n'avez pas de carte Sortie de Prison."})
+                    await ws.send_json({"event":"chat","msg":" Vous n'avez pas de carte Sortie de Prison."})
                     continue
                 room["goojf"][pid] -= 1
                 player["in_jail"] = False
                 player["jail_turns"] = 0
-                await broadcast(rid, {"event":"chat","msg":f"🎫 {player['name']} utilise sa carte Sortie de Prison!"})
+                await broadcast(rid, {"event":"chat","msg":f" {player['name']} utilise sa carte Sortie de Prison!"})
                 await broadcast(rid, get_state(rid))
             elif cmd == "pay_jail":
                 cur = room["order"][room["turn"] % len(room["order"])]
                 if pid != cur:
-                    await ws.send_json({"event":"chat","msg":"⚠️ Pas votre tour."})
+                    await ws.send_json({"event":"chat","msg":" Pas votre tour."})
                     continue
                 player = room["players"][pid]
                 if not player["in_jail"]:
-                    await ws.send_json({"event":"chat","msg":"❌ Vous n'êtes pas en prison."})
+                    await ws.send_json({"event":"chat","msg":" Vous n'êtes pas en prison."})
                     continue
                 if player["money"] < 50:
-                    await ws.send_json({"event":"chat","msg":"❌ Pas assez d'argent (50$ requis)."})
+                    await ws.send_json({"event":"chat","msg":" Pas assez d'argent (50$ requis)."})
                     continue
                 player["money"] -= 50
                 player["in_jail"] = False
                 player["jail_turns"] = 0
                 room["extra_roll"] = None
                 room["turn"] += 1
-                await broadcast(rid, {"event":"chat","msg":f"🔓 {player['name']} paie 50$ et sort de prison — tour terminé, lancez les dés au prochain tour!"})
+                await broadcast(rid, {"event":"chat","msg":f" {player['name']} paie 50$ et sort de prison — tour terminé, lancez les dés au prochain tour!"})
                 await broadcast(rid, get_state(rid))
             elif cmd == "auction":
                 if room.get("pending_buy") != pid:
@@ -596,7 +596,7 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                     "task": None,
                 }
                 p_name = PROPERTIES[pos]["name"]
-                await broadcast(rid, {"event": "chat", "msg": f"🔨 Enchère lancée pour {p_name}! 60 secondes pour miser."})
+                await broadcast(rid, {"event": "chat", "msg": f" Enchère lancée pour {p_name}! 60 secondes pour miser."})
                 await broadcast(rid, get_state(rid))
                 task = asyncio.create_task(asyncio.sleep(60))
                 room["pending_auction"]["task"] = task
@@ -614,7 +614,7 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 amount = max(0, int(msg.get("amount", 0)))
                 a["bids"][pid] = amount
                 label = f"{amount}$" if amount > 0 else "passe"
-                await broadcast(rid, {"event": "chat", "msg": f"📝 {room['players'][pid]['name']} a misé ({label})."})
+                await broadcast(rid, {"event": "chat", "msg": f" {room['players'][pid]['name']} a misé ({label})."})
                 await broadcast(rid, get_state(rid))
                 if set(a["eligible"]) == set(a["bids"].keys()):
                     if a.get("task"):
@@ -624,49 +624,49 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 pos = int(msg.get("pos", -1))
                 grp = COLOR_GROUPS.get(pos)
                 if not grp:
-                    await ws.send_json({"event":"chat","msg":"❌ Pas constructible."})
+                    await ws.send_json({"event":"chat","msg":" Pas constructible."})
                     continue
                 if room["owned"].get(pos) != pid:
-                    await ws.send_json({"event":"chat","msg":"❌ Vous ne possédez pas cette propriété."})
+                    await ws.send_json({"event":"chat","msg":" Vous ne possédez pas cette propriété."})
                     continue
                 if not all(room["owned"].get(m) == pid for m in GROUP_MEMBERS[grp]):
-                    await ws.send_json({"event":"chat","msg":"❌ Vous devez posséder le monopole complet."})
+                    await ws.send_json({"event":"chat","msg":" Vous devez posséder le monopole complet."})
                     continue
                 houses = room["houses"]
                 current = houses.get(pos, 0)
                 if current >= 5:
-                    await ws.send_json({"event":"chat","msg":"❌ Déjà un hôtel sur cette propriété."})
+                    await ws.send_json({"event":"chat","msg":" Déjà un hôtel sur cette propriété."})
                     continue
                 # Construction équitable : ne peut pas avoir plus d'une maison de plus que les autres du groupe
                 max_others = max((houses.get(m, 0) for m in GROUP_MEMBERS[grp] if m != pos), default=0)
                 if current >= max_others + 1:
-                    await ws.send_json({"event":"chat","msg":"❌ Construction doit être équitable entre les propriétés du groupe."})
+                    await ws.send_json({"event":"chat","msg":" Construction doit être équitable entre les propriétés du groupe."})
                     continue
                 cost = HOUSE_PRICE[grp]
                 if rooms[rid]["players"][pid]["money"] < cost:
-                    await ws.send_json({"event":"chat","msg":f"❌ Pas assez d'argent ({cost}$ requis)."})
+                    await ws.send_json({"event":"chat","msg":f" Pas assez d'argent ({cost}$ requis)."})
                     continue
                 rooms[rid]["players"][pid]["money"] -= cost
                 houses[pos] = current + 1
                 label = "hôtel" if houses[pos] == 5 else f"{houses[pos]} maison(s)"
                 p_name = PROPERTIES[pos]["name"]
-                await broadcast(rid, {"event":"chat","msg":f"🏗️ {rooms[rid]['players'][pid]['name']} construit sur {p_name} ({label}) pour {cost}$"})
+                await broadcast(rid, {"event":"chat","msg":f" {rooms[rid]['players'][pid]['name']} construit sur {p_name} ({label}) pour {cost}$"})
                 await broadcast(rid, get_state(rid))
             elif cmd == "sell_house":
                 pos = int(msg.get("pos", -1))
                 grp = COLOR_GROUPS.get(pos)
                 if not grp or room["owned"].get(pos) != pid:
-                    await ws.send_json({"event":"chat","msg":"❌ Impossible."})
+                    await ws.send_json({"event":"chat","msg":" Impossible."})
                     continue
                 houses = room["houses"]
                 current = houses.get(pos, 0)
                 if current == 0:
-                    await ws.send_json({"event":"chat","msg":"❌ Aucune maison à vendre."})
+                    await ws.send_json({"event":"chat","msg":" Aucune maison à vendre."})
                     continue
                 # Vente équitable : ne peut pas vendre si les autres ont moins
                 min_others = min((houses.get(m, 0) for m in GROUP_MEMBERS[grp] if m != pos), default=0)
                 if current <= min_others:
-                    await ws.send_json({"event":"chat","msg":"❌ Vente doit être équitable."})
+                    await ws.send_json({"event":"chat","msg":" Vente doit être équitable."})
                     continue
                 refund = HOUSE_PRICE[grp] // 2
                 rooms[rid]["players"][pid]["money"] += refund
@@ -675,12 +675,12 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 else:
                     houses[pos] = current - 1
                 p_name = PROPERTIES[pos]["name"]
-                await broadcast(rid, {"event":"chat","msg":f"💰 {rooms[rid]['players'][pid]['name']} vend une maison sur {p_name} (+{refund}$)"})
+                await broadcast(rid, {"event":"chat","msg":f" {rooms[rid]['players'][pid]['name']} vend une maison sur {p_name} (+{refund}$)"})
                 await broadcast(rid, get_state(rid))
             elif cmd == "trade_offer":
                 to = msg.get("to")
                 if to not in room["players"] or to == pid:
-                    await ws.send_json({"event": "chat", "msg": "❌ Joueur invalide."})
+                    await ws.send_json({"event": "chat", "msg": " Joueur invalide."})
                     continue
                 offer_goojf = min(int(msg.get("offer_goojf", 0)), room["goojf"].get(pid, 0))
                 req_goojf   = min(int(msg.get("req_goojf",   0)), room["goojf"].get(to,  0))
@@ -695,7 +695,7 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 }
                 from_name = room["players"][pid]["name"]
                 to_name   = room["players"][to]["name"]
-                await broadcast(rid, {"event": "chat", "msg": f"🤝 {from_name} propose un échange à {to_name}."})
+                await broadcast(rid, {"event": "chat", "msg": f" {from_name} propose un échange à {to_name}."})
                 await broadcast(rid, get_state(rid))
             elif cmd == "trade_accept":
                 t = room.get("pending_trade")
@@ -704,13 +704,13 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 giver, taker = room["players"][t["from"]], room["players"][t["to"]]
                 # Validate
                 if giver["money"] < t["offer_money"] or taker["money"] < t["req_money"]:
-                    await broadcast(rid, {"event": "chat", "msg": "❌ Fonds insuffisants pour l'échange."})
+                    await broadcast(rid, {"event": "chat", "msg": " Fonds insuffisants pour l'échange."})
                     room["pending_trade"] = None
                     await broadcast(rid, get_state(rid))
                     continue
                 if any(room["owned"].get(p) != t["from"] for p in t["offer_props"]) or \
                    any(room["owned"].get(p) != t["to"]   for p in t["req_props"]):
-                    await broadcast(rid, {"event": "chat", "msg": "❌ Propriété invalide dans l'échange."})
+                    await broadcast(rid, {"event": "chat", "msg": " Propriété invalide dans l'échange."})
                     room["pending_trade"] = None
                     await broadcast(rid, get_state(rid))
                     continue
@@ -723,14 +723,14 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 if og: room["goojf"][t["from"]] = max(0, room["goojf"].get(t["from"],0) - og); room["goojf"][t["to"]] = room["goojf"].get(t["to"],0) + og
                 if rg: room["goojf"][t["to"]]   = max(0, room["goojf"].get(t["to"],  0) - rg); room["goojf"][t["from"]] = room["goojf"].get(t["from"],0) + rg
                 room["pending_trade"] = None
-                await broadcast(rid, {"event": "chat", "msg": f"✅ Échange accepté entre {giver['name']} et {taker['name']}!"})
+                await broadcast(rid, {"event": "chat", "msg": f" Échange accepté entre {giver['name']} et {taker['name']}!"})
                 await broadcast(rid, get_state(rid))
             elif cmd == "trade_reject":
                 t = room.get("pending_trade")
                 if not t or t["to"] != pid:
                     continue
                 room["pending_trade"] = None
-                await broadcast(rid, {"event": "chat", "msg": f"❌ Échange refusé par {room['players'][pid]['name']}."})
+                await broadcast(rid, {"event": "chat", "msg": f" Échange refusé par {room['players'][pid]['name']}."})
                 await broadcast(rid, get_state(rid))
             elif cmd == "tax_flat":
                 if room.get("pending_tax") != pid:
@@ -738,12 +738,12 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 player = room["players"][pid]
                 player["money"] -= 200
                 room["pending_tax"] = None
-                await broadcast(rid, {"event": "chat", "msg": f"💸 {player['name']} paie 200$ de taxe sur le revenu."})
+                await broadcast(rid, {"event": "chat", "msg": f" {player['name']} paie 200$ de taxe sur le revenu."})
                 if player["money"] <= 0:
                     for m in do_bankruptcy(rid, pid): await broadcast(rid, {"event": "chat", "msg": m})
                 elif room.get("extra_roll") == pid:
                     room["extra_roll"] = None
-                    await broadcast(rid, {"event": "chat", "msg": "🎯 Double! Vous relancez les dés."})
+                    await broadcast(rid, {"event": "chat", "msg": " Double! Vous relancez les dés."})
                 else:
                     room["turn"] += 1
                 await broadcast(rid, get_state(rid))
@@ -768,57 +768,57 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 amount = max(1, wealth // 10)
                 player["money"] -= amount
                 room["pending_tax"] = None
-                await broadcast(rid, {"event": "chat", "msg": f"💸 {player['name']} paie {amount}$ (10% de {wealth}$)."})
+                await broadcast(rid, {"event": "chat", "msg": f" {player['name']} paie {amount}$ (10% de {wealth}$)."})
                 if player["money"] <= 0:
                     for m in do_bankruptcy(rid, pid): await broadcast(rid, {"event": "chat", "msg": m})
                 elif room.get("extra_roll") == pid:
                     room["extra_roll"] = None
-                    await broadcast(rid, {"event": "chat", "msg": "🎯 Double! Vous relancez les dés."})
+                    await broadcast(rid, {"event": "chat", "msg": " Double! Vous relancez les dés."})
                 else:
                     room["turn"] += 1
                 await broadcast(rid, get_state(rid))
             elif cmd == "mortgage":
                 pos = int(msg.get("pos", -1))
                 if room["owned"].get(pos) != pid:
-                    await ws.send_json({"event":"chat","msg":"❌ Vous ne possédez pas cette propriété."})
+                    await ws.send_json({"event":"chat","msg":" Vous ne possédez pas cette propriété."})
                     continue
                 if room.get("mortgaged", {}).get(pos):
-                    await ws.send_json({"event":"chat","msg":"❌ Déjà hypothéquée."})
+                    await ws.send_json({"event":"chat","msg":" Déjà hypothéquée."})
                     continue
                 if pos not in PROPERTIES:
-                    await ws.send_json({"event":"chat","msg":"❌ Non hypothécable."})
+                    await ws.send_json({"event":"chat","msg":" Non hypothécable."})
                     continue
                 grp = COLOR_GROUPS.get(pos)
                 if grp and any(room.get("houses", {}).get(m, 0) > 0 for m in GROUP_MEMBERS[grp]):
-                    await ws.send_json({"event":"chat","msg":"❌ Vendez toutes les maisons du groupe avant d'hypothéquer."})
+                    await ws.send_json({"event":"chat","msg":" Vendez toutes les maisons du groupe avant d'hypothéquer."})
                     continue
                 mortgage_value = PROPERTIES[pos]["price"] // 2
                 room["players"][pid]["money"] += mortgage_value
                 room.setdefault("mortgaged", {})[pos] = True
                 p_name = PROPERTIES[pos]["name"]
-                await broadcast(rid, {"event":"chat","msg":f"🏦 {room['players'][pid]['name']} hypothèque {p_name} (+{mortgage_value}$)."})
+                await broadcast(rid, {"event":"chat","msg":f" {room['players'][pid]['name']} hypothèque {p_name} (+{mortgage_value}$)."})
                 await broadcast(rid, get_state(rid))
             elif cmd == "unmortgage":
                 pos = int(msg.get("pos", -1))
                 if room["owned"].get(pos) != pid:
-                    await ws.send_json({"event":"chat","msg":"❌ Vous ne possédez pas cette propriété."})
+                    await ws.send_json({"event":"chat","msg":" Vous ne possédez pas cette propriété."})
                     continue
                 if not room.get("mortgaged", {}).get(pos):
-                    await ws.send_json({"event":"chat","msg":"❌ Cette propriété n'est pas hypothéquée."})
+                    await ws.send_json({"event":"chat","msg":" Cette propriété n'est pas hypothéquée."})
                     continue
                 unmortgage_cost = int(PROPERTIES[pos]["price"] * 0.55)
                 if room["players"][pid]["money"] < unmortgage_cost:
-                    await ws.send_json({"event":"chat","msg":f"❌ Pas assez d'argent ({unmortgage_cost}$ requis)."})
+                    await ws.send_json({"event":"chat","msg":f" Pas assez d'argent ({unmortgage_cost}$ requis)."})
                     continue
                 room["players"][pid]["money"] -= unmortgage_cost
                 room["mortgaged"][pos] = False
                 p_name = PROPERTIES[pos]["name"]
-                await broadcast(rid, {"event":"chat","msg":f"🏦 {room['players'][pid]['name']} lève l'hypothèque de {p_name} (-{unmortgage_cost}$)."})
+                await broadcast(rid, {"event":"chat","msg":f" {room['players'][pid]['name']} lève l'hypothèque de {p_name} (-{unmortgage_cost}$)."})
                 await broadcast(rid, get_state(rid))
             elif cmd == "chat":
                 n = room["players"][pid]["name"]
-                await broadcast(rid, {"event": "chat", "msg": f"💬 {n}: {msg.get('text','')}"})
+                await broadcast(rid, {"event": "chat", "msg": f" {n}: {msg.get('text','')}"})
     except WebSocketDisconnect:
         conns[rid].discard(ws)
         if pid in rooms.get(rid, {}).get("players", {}):
-            await broadcast(rid, {"event": "chat", "msg": f"👋 {rooms[rid]['players'][pid]['name']} a quitté."})
+            await broadcast(rid, {"event": "chat", "msg": f" {rooms[rid]['players'][pid]['name']} a quitté."})

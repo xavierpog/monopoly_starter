@@ -14,7 +14,7 @@
   <div class="ui-card w-full max-w-[340px] mx-4">
     <div class="p-8 flex flex-col gap-5">
       <div class="text-center">
-        <div class="text-5xl mb-4">🎲</div>
+        <div class="mb-4"><img src="/static/icons/dice-logo.svg" width="56" height="56"></div>
         <h1 class="font-bold tracking-[0.18em] uppercase" style="color:#F0EBE0;font-size:1.1rem">Monopoly Online</h1>
         <p class="mt-1.5 tracking-widest uppercase" style="font-size:10px;color:#8B93A7">Rejoignez ou créez une partie</p>
       </div>
@@ -51,39 +51,39 @@
         <span class="ui-label">Actions</span>
       </div>
       <div class="p-4 flex flex-col gap-2">
-        <button id="btn-start" onclick="send('start')" class="btn btn-primary">
-          Démarrer la partie
+        <button id="btn-start" onclick="send('start')" class="btn btn-primary" style="display:flex;align-items:center;gap:8px;justify-content:center">
+          <img src="/static/icons/play.svg" width="16" height="16"> Démarrer la partie
         </button>
-        <button id="btn-roll" onclick="send('roll')" disabled class="btn btn-primary">
-          🎲 Lancer les dés
+        <button id="btn-roll" onclick="send('roll')" disabled class="btn btn-primary" style="display:flex;align-items:center;gap:8px;justify-content:center">
+          <img src="/static/icons/dice.svg" width="16" height="16"> Lancer les dés
         </button>
-        <button id="btn-buy" onclick="send('buy')" disabled class="btn btn-secondary">
-          🏠 Acheter la propriété
+        <button id="btn-buy" onclick="send('buy')" disabled class="btn btn-secondary" style="display:flex;align-items:center;gap:8px">
+          <img src="/static/icons/house.svg" width="16" height="16"> Acheter la propriété
         </button>
-        <button id="btn-skip" onclick="send('auction')" disabled class="btn btn-secondary">
-          🔨 Enchère
+        <button id="btn-skip" onclick="send('auction')" disabled class="btn btn-secondary" style="display:flex;align-items:center;gap:8px">
+          <img src="/static/icons/hammer.svg" width="16" height="16"> Enchère
         </button>
-        <button id="btn-trade" onclick="openTrade()" disabled class="btn btn-secondary">
-          🤝 Proposer un échange
+        <button id="btn-trade" onclick="openTrade()" disabled class="btn btn-secondary" style="display:flex;align-items:center;gap:8px">
+          <img src="/static/icons/trade.svg" width="16" height="16"> Proposer un échange
         </button>
 
         <!-- Section prison -->
         <div id="jail-section" style="display:none"
           class="flex-col gap-2 pt-3 mt-1" style="border-top:1px solid #2E374F">
-          <p class="text-xs italic" style="color:#8B93A7">🚔 Vous êtes en prison :</p>
-          <button id="btn-goojf" onclick="send('use_goojf')" disabled class="btn btn-amber">
-            🎫 Utiliser ma carte Sortie de Prison
+          <p class="text-xs italic" style="color:#8B93A7;display:flex;align-items:center;gap:6px"><img src="/static/icons/lock.svg" width="12" height="12"> Vous êtes en prison :</p>
+          <button id="btn-goojf" onclick="send('use_goojf')" disabled class="btn btn-amber" style="display:flex;align-items:center;gap:8px">
+            <img src="/static/icons/ticket.svg" width="16" height="16"> Utiliser ma carte Sortie de Prison
           </button>
-          <button id="btn-payjail" onclick="send('pay_jail')" disabled class="btn btn-danger">
-            💰 Payer 50$ et finir mon tour
+          <button id="btn-payjail" onclick="send('pay_jail')" disabled class="btn btn-danger" style="display:flex;align-items:center;gap:8px">
+            <img src="/static/icons/coin.svg" width="16" height="16"> Payer 50$ et finir mon tour
           </button>
         </div>
 
-        <button id="btn-build" onclick="openBuild()" disabled class="btn btn-secondary">
-          🏗️ Construire / Vendre
+        <button id="btn-build" onclick="openBuild()" disabled class="btn btn-secondary" style="display:flex;align-items:center;gap:8px">
+          <img src="/static/icons/build.svg" width="16" height="16"> Construire / Vendre
         </button>
-        <button id="btn-inventory" onclick="openInventory()" class="btn btn-muted">
-          📋 Mes propriétés / Hypothèques
+        <button id="btn-inventory" onclick="openInventory()" class="btn btn-muted" style="display:flex;align-items:center;gap:8px">
+          <img src="/static/icons/list.svg" width="16" height="16"> Mes propriétés / Hypothèques
         </button>
       </div>
     </div>
@@ -91,7 +91,7 @@
     <!-- Enchère (JS ajoute .open) -->
     <div id="auction-panel" class="ui-card ui-card-amber">
       <div class="ui-card-header">
-        <span class="ui-label" style="color:#E8A03A">🔨 Enchère : <span id="auction-prop"></span></span>
+        <span class="ui-label" style="color:#E8A03A;display:flex;align-items:center;gap:6px"><img src="/static/icons/hammer.svg" width="12" height="12"> Enchère : <span id="auction-prop"></span></span>
       </div>
       <div class="p-4 text-sm">
         <p class="text-xs mb-2" style="color:#8B93A7">
@@ -157,7 +157,7 @@
 <!-- ══ Overlay victoire ══ -->
 <div id="win-overlay">
   <div id="win-box" class="rounded-2xl p-10 text-center mx-4" style="background:#1C2133;border:1px solid #2E374F;border-top:3px solid #E8B84B;max-width:380px;width:100%;box-shadow:0 25px 60px rgba(0,0,0,0.7)">
-    <div class="text-5xl mb-4">🏆</div>
+    <div class="mb-4"><img src="/static/icons/trophy.svg" width="56" height="56"></div>
     <h1 class="text-xl font-bold mb-2 tracking-wider uppercase" style="color:#E8B84B">Partie terminée !</h1>
     <p id="win-msg" class="text-sm mb-6" style="color:#A8B0C2"></p>
     <button onclick="document.getElementById('win-overlay').classList.remove('open')"
@@ -170,7 +170,7 @@
 <!-- ══ Modal taxe ══ -->
 <div id="tax-overlay">
   <div class="rounded-2xl mx-4 text-center" style="background:#1C2133;border:1px solid #2E374F;border-top:3px solid #E8B84B;padding:32px;max-width:380px;width:100%;box-shadow:0 25px 60px rgba(0,0,0,0.7)">
-    <div class="text-3xl mb-3">💸</div>
+    <div class="mb-3"><img src="/static/icons/dollar.svg" width="40" height="40"></div>
     <h2 class="text-base font-bold mb-2" style="color:#F0EBE0">Taxe sur le revenu</h2>
     <div id="tax-info" class="text-sm mb-6" style="color:#A8B0C2"></div>
     <div class="flex gap-3">
@@ -190,7 +190,7 @@
 <div id="inventory-overlay">
   <div class="rounded-2xl mx-4" style="background:#1C2133;border:1px solid #2E374F;border-top:3px solid #E8B84B;padding:24px;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,0.7)">
     <div class="flex items-center justify-between pb-3 mb-4" style="border-bottom:1px solid #2E374F">
-      <h2 class="font-bold" style="color:#F0EBE0;font-size:0.9rem">📋 Mes propriétés</h2>
+      <h2 class="font-bold" style="color:#F0EBE0;font-size:0.9rem;display:flex;align-items:center;gap:6px"><img src="/static/icons/list.svg" width="14" height="14"> Mes propriétés</h2>
     </div>
     <div id="inventory-content"></div>
     <button onclick="document.getElementById('inventory-overlay').classList.remove('open')"
@@ -204,7 +204,7 @@
 <div id="build-overlay">
   <div class="rounded-2xl mx-4" style="background:#1C2133;border:1px solid #2E374F;border-top:3px solid #E8B84B;padding:24px;width:100%;max-width:440px;max-height:85vh;overflow-y:auto;box-shadow:0 25px 60px rgba(0,0,0,0.7)">
     <div class="flex items-center justify-between pb-3 mb-4" style="border-bottom:1px solid #2E374F">
-      <h2 class="font-bold" style="color:#F0EBE0;font-size:0.9rem">🏗️ Construire / Vendre</h2>
+      <h2 class="font-bold" style="color:#F0EBE0;font-size:0.9rem;display:flex;align-items:center;gap:6px"><img src="/static/icons/build.svg" width="14" height="14"> Construire / Vendre</h2>
     </div>
     <div id="build-groups"></div>
     <button onclick="closeBuild()"
@@ -259,6 +259,6 @@
   </div>
 </div>
 
-<script src="/static/game.js?v=2"></script>
+<script src="/static/game.js?v=3"></script>
 </body>
 </html>

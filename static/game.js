@@ -73,15 +73,17 @@ function render(s){
   const pc = document.getElementById('players');
   pc.innerHTML = s.players.map(p =>
     `<div class="pcard${p.id===s.turn?' active-turn':''}${p.bankrupt?' bankrupt':''}">
-      ${p.icon} ${esc(p.name)}${p.id===myPid?' (vous)':''}
+      <img src="/static/tokens/${p.icon}.svg" width="20" height="20" style="border-radius:50%;flex-shrink:0;vertical-align:middle">
+      ${esc(p.name)}${p.id===myPid?' (vous)':''}
       <span class="pmoney"> — ${p.money}$</span>
-      <span style="color:#888;font-size:.75rem"> case ${p.pos}${p.in_jail?' 🚔 prison ('+p.jail_turns+'/3)':''}${p.goojf?'  🎫×'+p.goojf:''}${p.bankrupt?' 💀 en faillite':''}</span>
+      <span style="color:#888;font-size:.75rem"> case ${p.pos}${p.in_jail?' · Prison ('+p.jail_turns+'/3)':''}${p.goojf?'  · Carte×'+p.goojf:''}${p.bankrupt?' · Faillite':''}</span>
     </div>`
   ).join('');
   // Écran de victoire
   if (s.game_over && s.winner) {
     const winner = s.players.find(p => p.id === s.winner);
-    document.getElementById('win-msg').textContent = `${winner?.icon} ${winner?.name} remporte la partie!`;
+    const _icon = winner?.icon||'red';
+    document.getElementById('win-msg').innerHTML = `<img src="/static/tokens/${_icon}.svg" width="22" height="22" style="vertical-align:middle;margin-right:6px">${esc(winner?.name||'')} remporte la partie !`;
     document.getElementById('win-overlay').classList.add('open');
   }
   // Buttons
@@ -130,10 +132,10 @@ function render(s){
   renderIncomingTrade(s.pending_trade, s.players);
   renderAuction(s.pending_auction, s.players);
   // Pions
-  document.querySelectorAll('.pions').forEach(e=>e.textContent='');
-  s.players.forEach(p=>{ const el=document.getElementById(`p${p.pos}`); if(el) el.textContent+=p.icon; });
+  document.querySelectorAll('.pions').forEach(e=>e.innerHTML='');
+  s.players.forEach(p=>{ const el=document.getElementById(`p${p.pos}`); if(el) el.innerHTML+=`<img src="/static/tokens/${p.icon}.svg" width="18" height="18" style="display:inline-block">`; });
   // Owned — contour coloré par joueur
-  const ICON_COLOR = {'🔴':'#ef4444','🔵':'#3b82f6','🟢':'#22c55e','🟡':'#eab308','🟠':'#f97316','🟣':'#a855f7','⚫':'#6b7280','🟤':'#92400e'};
+  const ICON_COLOR = {'red':'#ef4444','blue':'#3b82f6','green':'#22c55e','yellow':'#eab308','orange':'#f97316','purple':'#a855f7','gray':'#6b7280','brown':'#92400e'};
   const pidColor = {};
   s.players.forEach(p => { pidColor[p.id] = ICON_COLOR[p.icon] || '#E8B84B'; });
   document.querySelectorAll('.sq').forEach(e => {
@@ -151,7 +153,9 @@ function render(s){
   Object.entries(s.houses||{}).forEach(([k,n])=>{
     const sq=document.querySelector(`[data-i="${k}"]`); if(!sq) return;
     const el=document.createElement('div'); el.className='houses-display';
-    el.textContent = n===5 ? '🏨' : '🏠'.repeat(n);
+    el.innerHTML = n===5
+      ? '<span style="color:#fbbf24;font-weight:700">★</span>'
+      : '<span style="color:#4ade80">'+('■').repeat(n)+'</span>';
     sq.appendChild(el);
   });
   // Mortgaged indicator
@@ -161,7 +165,8 @@ function render(s){
     if(!v) return;
     const sq=document.querySelector(`[data-i="${k}"]`); if(!sq) return;
     sq.classList.add('mortgaged-sq');
-    const badge=document.createElement('div'); badge.className='mortgage-badge'; badge.textContent='🏦';
+    const badge=document.createElement('div'); badge.className='mortgage-badge';
+    badge.innerHTML='<img src="/static/icons/bank.svg" width="12" height="12" title="Hypothèque">';
     sq.appendChild(badge);
   });
 }
@@ -203,7 +208,7 @@ const HOUSE_PRICE = {brown:50,cyan:50,pink:100,orange:100,red:150,yellow:150,gre
 const GROUP_LABEL = {brown:"Marron",cyan:"Bleu clair",pink:"Rose",orange:"Orange",red:"Rouge",yellow:"Jaune",green:"Vert",dblue:"Bleu foncé"};
 
 // Retourne l'icône représentant les maisons ou l'hôtel pour une case donnée
-function houseLabel(n){ return n===5?"🏨 Hôtel":"🏠".repeat(n)||"—"; }
+function houseLabel(n){ return n===5?'<span style="color:#fbbf24">★</span> Hôtel':'<span style="color:#4ade80">'+('■').repeat(n)+'</span>'||"—"; }
 
 // Ouvre le modal de construction et liste les monopoles possédés avec leurs maisons actuelles
 function openBuild(){
@@ -248,7 +253,7 @@ function openInventory(){
   const goojfCount = gs.players.find(p=>p.id===myPid)?.goojf||0;
   const SWATCH = {brown:'#955436',cyan:'#00aeef',pink:'#d93a96',orange:'#f7941d',red:'#ed1b24',yellow:'#fef200',green:'#1fb25a',dblue:'#0050a0'};
   let html = '';
-  if(goojfCount > 0) html += `<p style="margin-bottom:10px">🎫 Cartes Sortie de Prison : <strong>${goojfCount}</strong></p>`;
+  if(goojfCount > 0) html += `<p style="margin-bottom:10px"><img src="/static/icons/ticket.svg" width="14" height="14" style="vertical-align:middle;margin-right:4px">Cartes Sortie de Prison : <strong>${goojfCount}</strong></p>`;
   if(myOwned.length === 0 && goojfCount === 0){
     html = '<em style="color:#aaa">Vous ne possédez aucune propriété.</em>';
   } else {
@@ -258,7 +263,7 @@ function openInventory(){
       const monopole = members.every(p=>myOwned.includes(p));
       const swatch = SWATCH[grp]||'#888';
       html += `<div class="inv-group">`;
-      html += `<h3><span class="inv-swatch" style="background:${swatch}"></span>${GROUP_LABEL[grp]||grp}${monopole?' ✅':''}</h3>`;
+      html += `<h3><span class="inv-swatch" style="background:${swatch}"></span>${GROUP_LABEL[grp]||grp}${monopole?' <img src="/static/icons/check.svg" width="14" height="14" style="vertical-align:middle">':''}</h3>`;
       const groupHasHouses = GROUP_MEMBERS[grp].some(p=>(gs.houses[p]||0)>0);
       html += `<div class="inv-row header"><span>Terrain</span><span>Maisons</span><span>Action</span></div>`;
       mine.forEach(p=>{
@@ -275,7 +280,7 @@ function openInventory(){
         } else {
           action = `<span style="color:#aaa;font-size:.7rem">Vendez maisons</span>`;
         }
-        html += `<div class="inv-row"${isMort?' style="opacity:.6;text-decoration:line-through"':''}><span>${name}${isMort?' 🏦':''}</span><span>${houseLabel(h)}</span><span>${action}</span></div>`;
+        html += `<div class="inv-row"${isMort?' style="opacity:.6;text-decoration:line-through"':''}><span>${name}${isMort?' <img src="/static/icons/bank.svg" width="12" height="12" style="vertical-align:middle">':''}</span><span>${houseLabel(h)}</span><span>${action}</span></div>`;
       });
       html += `</div>`;
     });
@@ -295,7 +300,7 @@ function openInventory(){
         } else {
           action2 = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer" onclick="ws?.send(JSON.stringify({cmd:'mortgage',pos:${p}}));setTimeout(openInventory,200)">Hypothéquer (+${mortValue2}$)</button>`;
         }
-        html += `<div class="inv-row"${isMort2?' style="opacity:.6"':''}><span>${name}${isMort2?' 🏦':''}</span><span></span><span>${action2}</span></div>`;
+        html += `<div class="inv-row"${isMort2?' style="opacity:.6"':''}><span>${name}${isMort2?' <img src="/static/icons/bank.svg" width="12" height="12" style="vertical-align:middle">':''}</span><span></span><span>${action2}</span></div>`;
       });
       html += `</div>`;
     }
@@ -333,7 +338,7 @@ function renderAuction(a, players) {
 
   // Who hasn't bid yet
   const pending = a.eligible.filter(p => !a.submitted.includes(p))
-    .map(p => { const pl = players.find(x => x.id === p); return pl ? `${pl.icon} ${esc(pl.name)}` : p; });
+    .map(p => { const pl = players.find(x => x.id === p); return pl ? `<img src="/static/tokens/${pl.icon}.svg" width="14" height="14" style="vertical-align:middle"> ${esc(pl.name)}` : p; });
 
   if (!iAmEligible) {
     bidRow.style.display = 'none';
@@ -341,7 +346,7 @@ function renderAuction(a, players) {
     waiting.textContent = pending.length ? `En attente de : ${pending.join(', ')}` : 'Toutes les mises reçues…';
   } else if (iAlreadyBid) {
     bidRow.style.display = 'none';
-    submitted.textContent = '✅ Mise soumise — en attente des autres.';
+    submitted.textContent = 'Mise soumise — en attente des autres.';
     waiting.textContent = pending.length ? `En attente de : ${pending.join(', ')}` : 'Toutes les mises reçues…';
   } else {
     bidRow.style.display = 'flex';
@@ -355,7 +360,7 @@ function submitBid(forced) {
   const amount = forced === 0 ? 0 : Math.max(0, parseInt(document.getElementById('auction-amount').value) || 0);
   ws?.send(JSON.stringify({ cmd: 'bid', amount }));
   document.getElementById('auction-bid-row').style.display = 'none';
-  document.getElementById('auction-submitted').textContent = amount === 0 ? '✅ Vous avez passé.' : `✅ Mise de ${amount}$ soumise.`;
+  document.getElementById('auction-submitted').textContent = amount === 0 ? 'Passé.' : `Mise de ${amount}$ soumise.`;
 }
 
 // Ouvre le modal d'échange et peuple la liste des joueurs, des propriétés offertes et demandées
@@ -363,14 +368,14 @@ function openTrade(){
   if(!gs) return;
   const sel = document.getElementById('trade-target');
   sel.innerHTML = gs.players.filter(p=>p.id!==myPid && !p.bankrupt)
-    .map(p=>`<option value="${esc(p.id)}">${p.icon} ${esc(p.name)}</option>`).join('');
+    .map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
 
   const me = gs.players.find(p=>p.id===myPid);
   const myGoojf = me?.goojf || 0;
   const myProps = Object.entries(gs.owned).filter(([,owner])=>owner===myPid).map(([k])=>k);
   const offerItems = [
     ...myProps.map(k=>`<label><input type="checkbox" value="${k}"> ${PROP_NAMES[k]||'#'+k}</label>`),
-    ...(myGoojf > 0 ? [`<label><input type="checkbox" value="goojf"> 🎫 Sortie de Prison${myGoojf>1?' ×'+myGoojf:''}</label>`] : [])
+    ...(myGoojf > 0 ? [`<label><input type="checkbox" value="goojf"> <img src="/static/icons/ticket.svg" width="12" height="12" style="vertical-align:middle"> Sortie de Prison${myGoojf>1?' ×'+myGoojf:''}</label>`] : [])
   ];
   document.getElementById('trade-offer-props').innerHTML = offerItems.length
     ? offerItems.join('')
@@ -392,7 +397,7 @@ function renderReqProps(){
   const theirProps = Object.entries(gs.owned).filter(([,owner])=>owner===targetId).map(([k])=>k);
   const reqItems = [
     ...theirProps.map(k=>`<label><input type="checkbox" value="${k}"> ${PROP_NAMES[k]||'#'+k}</label>`),
-    ...(theirGoojf > 0 ? [`<label><input type="checkbox" value="goojf"> 🎫 Sortie de Prison${theirGoojf>1?' ×'+theirGoojf:''}</label>`] : [])
+    ...(theirGoojf > 0 ? [`<label><input type="checkbox" value="goojf"> <img src="/static/icons/ticket.svg" width="12" height="12" style="vertical-align:middle"> Sortie de Prison${theirGoojf>1?' ×'+theirGoojf:''}</label>`] : [])
   ];
   document.getElementById('trade-req-props').innerHTML = reqItems.length
     ? reqItems.join('')
@@ -423,13 +428,13 @@ function renderIncomingTrade(trade, players){
   if(!trade || trade.to !== myPid){ el.classList.remove('open'); return; }
   const from = players.find(p=>p.id===trade.from);
   const propName = k => PROP_NAMES[k]||'#'+k;
-  let html = `<strong>${from?.icon} ${esc(from?.name ?? '')}</strong> vous propose :<br>`;
-  if(trade.offer_money) html += `💵 Offre ${trade.offer_money}$<br>`;
-  if(trade.offer_props.length) html += `🏠 Offre : ${trade.offer_props.map(propName).join(', ')}<br>`;
-  if(trade.offer_goojf) html += `🎫 Offre une Carte Sortie de Prison<br>`;
-  if(trade.req_money) html += `💵 Demande ${trade.req_money}$<br>`;
-  if(trade.req_props.length) html += `🏠 Demande : ${trade.req_props.map(propName).join(', ')}<br>`;
-  if(trade.req_goojf) html += `🎫 Demande une Carte Sortie de Prison<br>`;
+  let html = `<strong><img src="/static/tokens/${from?.icon||'red'}.svg" width="16" height="16" style="vertical-align:middle;margin-right:4px">${esc(from?.name ?? '')}</strong> vous propose :<br>`;
+  if(trade.offer_money) html += `Offre ${trade.offer_money}$<br>`;
+  if(trade.offer_props.length) html += `Terrains offerts : ${trade.offer_props.map(propName).join(', ')}<br>`;
+  if(trade.offer_goojf) html += `Offre une Carte Sortie de Prison<br>`;
+  if(trade.req_money) html += `Demande ${trade.req_money}$<br>`;
+  if(trade.req_props.length) html += `Terrains demandés : ${trade.req_props.map(propName).join(', ')}<br>`;
+  if(trade.req_goojf) html += `Demande une Carte Sortie de Prison<br>`;
   document.getElementById('ti-details').innerHTML = html;
   el.classList.add('open');
 }
@@ -461,10 +466,10 @@ function connectWs(){
     if(myPid){
       const d = reconnectDelay;
       reconnectDelay = Math.min(reconnectDelay * 2, 16000);
-      log(`🔌 Connexion perdue — reconnexion dans ${d/1000}s…`);
+      log(`Connexion perdue — reconnexion dans ${d/1000}s…`);
       setTimeout(connectWs, d);
     } else {
-      log('🔌 Déconnecté.');
+      log('Déconnecté.');
     }
   };
 }
