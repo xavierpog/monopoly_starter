@@ -249,6 +249,7 @@ function closeBuild(){ document.getElementById('build-overlay').classList.remove
 // Ouvre le modal d'inventaire : propriétés groupées par couleur avec statut hypothèque et boutons d'action
 function openInventory(){
   if(!gs) return;
+  const isMyTurn = gs.turn === myPid;
   const myOwned = Object.entries(gs.owned).filter(([,o])=>o===myPid).map(([k])=>parseInt(k));
   const goojfCount = gs.players.find(p=>p.id===myPid)?.goojf||0;
   const SWATCH = {brown:'#955436',cyan:'#00aeef',pink:'#d93a96',orange:'#f7941d',red:'#ed1b24',yellow:'#fef200',green:'#1fb25a',dblue:'#0050a0'};
@@ -273,10 +274,11 @@ function openInventory(){
         const mortValue = Math.floor((PROPS[p]?.p||0)/2);
         const unmortCost = Math.ceil((PROPS[p]?.p||0)*0.55);
         let action;
+        const disabledAttr = isMyTurn ? '' : ' disabled title="Pas votre tour"';
         if(isMort){
-          action = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer" onclick="ws?.send(JSON.stringify({cmd:'unmortgage',pos:${p}}));setTimeout(openInventory,200)">Lever (${unmortCost}$)</button>`;
+          action = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer"${disabledAttr} onclick="ws?.send(JSON.stringify({cmd:'unmortgage',pos:${p}}));setTimeout(openInventory,200)">Lever (${unmortCost}$)</button>`;
         } else if(!groupHasHouses){
-          action = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer" onclick="ws?.send(JSON.stringify({cmd:'mortgage',pos:${p}}));setTimeout(openInventory,200)">Hypothéquer (+${mortValue}$)</button>`;
+          action = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer"${disabledAttr} onclick="ws?.send(JSON.stringify({cmd:'mortgage',pos:${p}}));setTimeout(openInventory,200)">Hypothéquer (+${mortValue}$)</button>`;
         } else {
           action = `<span style="color:#aaa;font-size:.7rem">Vendez maisons</span>`;
         }
@@ -295,10 +297,11 @@ function openInventory(){
         const mortValue2 = Math.floor((PROPS[p]?.p||0)/2);
         const unmortCost2 = Math.ceil((PROPS[p]?.p||0)*0.55);
         let action2;
+        const disabledAttr2 = isMyTurn ? '' : ' disabled title="Pas votre tour"';
         if(isMort2){
-          action2 = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer" onclick="ws?.send(JSON.stringify({cmd:'unmortgage',pos:${p}}));setTimeout(openInventory,200)">Lever (${unmortCost2}$)</button>`;
+          action2 = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer"${disabledAttr2} onclick="ws?.send(JSON.stringify({cmd:'unmortgage',pos:${p}}));setTimeout(openInventory,200)">Lever (${unmortCost2}$)</button>`;
         } else {
-          action2 = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer" onclick="ws?.send(JSON.stringify({cmd:'mortgage',pos:${p}}));setTimeout(openInventory,200)">Hypothéquer (+${mortValue2}$)</button>`;
+          action2 = `<button style="font-size:.7rem;padding:2px 6px;cursor:pointer"${disabledAttr2} onclick="ws?.send(JSON.stringify({cmd:'mortgage',pos:${p}}));setTimeout(openInventory,200)">Hypothéquer (+${mortValue2}$)</button>`;
         }
         html += `<div class="inv-row"${isMort2?' style="opacity:.6"':''}><span>${name}${isMort2?' <img src="/static/icons/bank.svg" width="12" height="12" style="vertical-align:middle">':''}</span><span></span><span>${action2}</span></div>`;
       });
@@ -343,15 +346,15 @@ function renderAuction(a, players) {
   if (!iAmEligible) {
     bidRow.style.display = 'none';
     submitted.textContent = '';
-    waiting.textContent = pending.length ? `En attente de : ${pending.join(', ')}` : 'Toutes les mises reçues…';
+    waiting.innerHTML = pending.length ? `En attente de : ${pending.join(', ')}` : 'Toutes les mises reçues…';
   } else if (iAlreadyBid) {
     bidRow.style.display = 'none';
     submitted.textContent = 'Mise soumise — en attente des autres.';
-    waiting.textContent = pending.length ? `En attente de : ${pending.join(', ')}` : 'Toutes les mises reçues…';
+    waiting.innerHTML = pending.length ? `En attente de : ${pending.join(', ')}` : 'Toutes les mises reçues…';
   } else {
     bidRow.style.display = 'flex';
     submitted.textContent = '';
-    waiting.textContent = pending.length > 1 ? `En attente aussi de : ${pending.filter(p=>p!==myPid).join(', ')}` : '';
+    waiting.innerHTML = pending.length > 1 ? `En attente aussi de : ${pending.filter(p=>p!==myPid).join(', ')}` : '';
   }
 }
 

@@ -143,11 +143,9 @@ def apply_card(rid, pid, card, roll):
             msgs += do_bankruptcy(rid, pid)
     elif action == "goto":
         dest = card["dest"]
-        if dest <= player["pos"] and dest != player["pos"]:
-            player["money"] += 200; msgs.append(" Passage DÉPART +200$")
+        if dest == 0 or (dest < player["pos"]):
+            player["money"] += 200; msgs.append("Passage DÉPART +200$")
         player["pos"] = dest
-        if dest == 0:
-            player["money"] += 200; msgs.append(" Passage DÉPART +200$")
     elif action == "back3":
         player["pos"] = (player["pos"] - 3) % 40
     elif action == "jail":
@@ -778,6 +776,10 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                     room["turn"] += 1
                 await broadcast(rid, get_state(rid))
             elif cmd == "mortgage":
+                cur = room["order"][room["turn"] % len(room["order"])]
+                if pid != cur:
+                    await ws.send_json({"event":"chat","msg":"Pas votre tour."})
+                    continue
                 pos = int(msg.get("pos", -1))
                 if room["owned"].get(pos) != pid:
                     await ws.send_json({"event":"chat","msg":" Vous ne possédez pas cette propriété."})
@@ -799,6 +801,10 @@ async def ws_ep(ws: WebSocket, rid: str, name: str):
                 await broadcast(rid, {"event":"chat","msg":f" {room['players'][pid]['name']} hypothèque {p_name} (+{mortgage_value}$)."})
                 await broadcast(rid, get_state(rid))
             elif cmd == "unmortgage":
+                cur = room["order"][room["turn"] % len(room["order"])]
+                if pid != cur:
+                    await ws.send_json({"event":"chat","msg":"Pas votre tour."})
+                    continue
                 pos = int(msg.get("pos", -1))
                 if room["owned"].get(pos) != pid:
                     await ws.send_json({"event":"chat","msg":" Vous ne possédez pas cette propriété."})
